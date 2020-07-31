@@ -23,7 +23,7 @@ We use Singularity version 3.4.
     -B /path/to/freesurfer/license.txt:/APPS/freesurfer/license.txt
     --nv
     /path/to/prequal_v1.0.0.simg
-    pe\_axis
+    pe_axis
     [options]
     
 * Binding the freesurfer license is optional and only needed for Synb0-DisCo
@@ -51,7 +51,7 @@ We use Singularity version 3.4.
 
   * t1.nii.gz (Optional, used for Synb0-DisCo, must be named exactly)
 
-  * Other files as needed (see `--extra\_eddy\_args` for more information)
+  * Other files as needed (see `--extra_eddy_args` for more information)
 
 * **Output Directory:** Outputs listed at the end of this document
 
