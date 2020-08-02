@@ -204,7 +204,7 @@ Default = sess
 
 * All NIFTI images are consistent with a conversion from a DICOM using `dcm2niix` ([at least v1.0.20180622](https://github.com/rordenlab/dcm2niix/releases/tag/v1.0.20180622)) by Chris Rorden and are raw NIFTIs without distortion correction. We require this as dcm2niix exports b-value/b-vector files in FSL format and removes ADC or trace images auto-generated in some Philips DICOMs. In addition `dcm2niix` correctly moves the gradients from scanner to subject space, whereas some Philips PARREC converters do not, which may result in spurious results or pipeline failure. 
 
-  * **We expect raw volumes only, no ADC or trace volumes****.** ADC volumes are sometimes encoded as having a b-value greater than 0 with a corresponding b-vector of (0,0,0) and trace volumes are sometimes encoded as having a b-value of 0 with a corresponding non-unit normalized b-vector, as in the case of some Philips PARREC converters. We check for these cases, remove the affected volumes, and report a warning in the console and in the PDF. 
+  * **We expect raw volumes only, no ADC or trace volumes.** ADC volumes are sometimes encoded as having a b-value greater than 0 with a corresponding b-vector of (0,0,0) and trace volumes are sometimes encoded as having a b-value of 0 with a corresponding non-unit normalized b-vector, as in the case of some Philips PARREC converters. We check for these cases, remove the affected volumes, and report a warning in the console and in the PDF. 
 
   * We cannot, unfortunately, account for failure of reorientation of gradients into subject space.
 
