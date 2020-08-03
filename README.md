@@ -6,8 +6,8 @@
 
 ## Containerization of Source Code
 
-    git clone 
-    cd /path/to/repo
+    git clone https://github.com/MASILab/PreQual.git
+    cd /path/to/repo/PreQual
     git checkout v1.0.0
     singularity build /path/to/prequal_v1.0.0.simg Singularity
 
