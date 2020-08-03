@@ -20,6 +20,7 @@ We use Singularity version 3.4.
     --contain
     -B /path/to/inputs/directory/:/INPUTS
     -B /path/to/outputs/directory/:/OUTPUTS
+    -B /tmp:/tmp
     -B /path/to/freesurfer/license.txt:/APPS/freesurfer/license.txt
     --nv
     /path/to/prequal_v1.0.0.simg
@@ -27,7 +28,8 @@ We use Singularity version 3.4.
     [options]
     
 * Binding the freesurfer license is optional and only needed for Synb0-DisCo
-* `--nv` is optional. See options `--eddy_cuda` and `--eddy_extra_args`; GPU support currently experimental
+* Binding the tmp directory is necessary when running the image with `--contain`.
+* `--nv` is optional. See options `--eddy_cuda` and `--eddy_extra_args`. **GPU support is currently experimental.**
 
 ## Arguments
 
@@ -400,13 +402,13 @@ Folders and files in *italics* are removed if `--keep_intermediates` is NOT indi
 
     * acqparams.txt (same as OUTPUTS/EDDY/acqparams.txt)
 
-    * *preproc\_input\_b0\_first.nii.gz (only if Synb0-DisCo is run)*
+    * *preproc\_input\_b0\_first.nii.gz* (only if Synb0-DisCo is run)
 
     * b0\_syn.nii.gz (only if Synb0-DisCo is run)
 
-    * *preproc\_input\_b0\_all.nii.gz or preproc\_input\_b0\_all\_smooth\_with\_b0\_syn.nii.gz*
+    * *preproc\_input\_b0\_all.nii.gz* or *preproc\_input\_b0\_all\_smooth\_with\_b0\_syn.nii.gz*
 
-    * *preproc\_input\_b0\_all\_topped\_up.nii.gz or preproc\_input\_b0\_all\_smooth\_with\_b0\_syn\_topped\_up.nii.gz*
+    * *preproc\_input\_b0\_all\_topped\_up.nii.gz* or *preproc\_input\_b0\_all\_smooth\_with\_b0\_syn\_topped\_up.nii.gz*
 
     * preproc\_input\_b0\_all.topup\_log or preproc\_input\_b0\_all\_smooth\_with\_b0\_syn.topup\_log
 
@@ -418,7 +420,7 @@ Folders and files in *italics* are removed if `--keep_intermediates` is NOT indi
 
 1. **EDDY**
 
-    * **acqparams.txt (same as OUTPUTS/TOPUP/acqparams.txt)**
+    * **acqparams.txt** (same as OUTPUTS/TOPUP/acqparams.txt)
 
     * **index.txt**
 
@@ -428,7 +430,7 @@ Folders and files in *italics* are removed if `--keep_intermediates` is NOT indi
 
     * *preproc\_input.bvec*
 
-    * *preproc\_input\_eddyed.nii.gz (renamed from "eddy\_results.nii.gz")*
+    * *preproc\_input\_eddyed.nii.gz* (renamed from "eddy\_results.nii.gz")
 
     * *preproc\_input\_eddyed.bval*
 
@@ -438,11 +440,11 @@ Folders and files in *italics* are removed if `--keep_intermediates` is NOT indi
 
     * **eddy\_results.eddy\_command\_txt**
 
-    * **eddy\_results.eddy\_movement\_rms (describes volume-wise RMS displacement)**
+    * **eddy\_results.eddy\_movement\_rms** (describes volume-wise RMS displacement)
 
     * **eddy\_results.eddy\_outlier\_free\_data.nii.gz**
 
-    * **eddy\_results.eddy\_outlier\_map (describes which slices were deemed outliers)**
+    * **eddy\_results.eddy\_outlier\_map** (describes which slices were deemed outliers)
 
     * **eddy\_results.eddy\_outlier\_n\_sqr\_stdev\_map**
 
@@ -450,7 +452,7 @@ Folders and files in *italics* are removed if `--keep_intermediates` is NOT indi
 
     * **eddy\_results.eddy\_outlier\_report**
 
-    * **eddy\_results.eddy\_parameters (describes volume-wise rotation and translation)**
+    * **eddy\_results.eddy\_parameters** (describes volume-wise rotation and translation)
 
     * **eddy\_results.eddy\_post\_eddy\_shell\_alignment\_parameters**
 
@@ -466,7 +468,7 @@ Folders and files in *italics* are removed if `--keep_intermediates` is NOT indi
 
 1. *POSTNORMALIZED* (these files are only created if `--postnormalize` is on)
 
-    * *\<image1\_%\>\_topup\_eddy\_norm.nii.gz ("\_topup" only applies if topup was run)*
+    * *\<image1\_%\>\_topup\_eddy\_norm.nii.gz* ("\_topup" only applies if topup was run)
 
         :
 
@@ -474,13 +476,13 @@ Folders and files in *italics* are removed if `--keep_intermediates` is NOT indi
 
 1. *UNBIASED* (these files are only created if `--correct_bias` is on; this folder is removed if `--correct_bias` is off)
 
-    * *normed\_unbiased.nii.gz (if postnormalization is run) or preproc\_input\_eddyed\_unbiased.nii.gz (if postnormalization is not run)*
+    * *normed\_unbiased.nii.gz* (if postnormalization is run) or *preproc\_input\_eddyed\_unbiased.nii.gz* (if postnormalization is not run)
 
     * bias\_field.nii.gz
 
 1. **PREPROCESSED** (these represent the final output of the pipeline)
 
-    * *dwmri.nii.gz (dwmri\* files deleted only if `--split_outputs` is also set)*
+    * *dwmri.nii.gz* (dwmri\* files deleted only if `--split_outputs` is also set)
 
     * *dwmri.bval*
 
@@ -540,9 +542,9 @@ Folders and files in *italics* are removed if `--keep_intermediates` is NOT indi
 
     * **roi\_avg\_fa.txt**
 
-    * **stats.csv (contains summary of all motion, SNR/CNR, and average FA stats)**
+    * **stats.csv** (contains summary of all motion, SNR/CNR, and average FA stats)
 
-1. **OPTIMIZED\_BVECS**
+1. **OPTIMIZED\_BVECS** (these are sign/axis permuted per `dwigradcheck` and are used for QA purposes)
 
     * **dwmri.bval**
 
@@ -550,5 +552,5 @@ Folders and files in *italics* are removed if `--keep_intermediates` is NOT indi
 
 1. **PDF**
 
-    * **dtiQA.pdf (final QA document)**
+    * **dtiQA.pdf** (final QA document)
 
