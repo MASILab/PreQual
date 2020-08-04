@@ -89,7 +89,7 @@ From: ubuntu:18.04
     mv src/CODE/* /CODE
     mv src/SUPPLEMENTAL/* /SUPPLEMENTAL
     cd /APPS/synb0
-    python3 -m venv pytorch
+    python3.6 -m venv pytorch
     source pytorch/bin/activate
     pip3 install wheel
     pip install -r /INSTALLERS/PreQual/venv/pip_install_synb0.txt
