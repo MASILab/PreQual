@@ -1,4 +1,4 @@
-# PreQual v1.0.0 (dtiQA v7.1.3 Multi) User Guide
+# PreQual v1.0.0 (dtiQA v7.1.4 Multi) User Guide
 
 [Leon Cai](leon.y.cai@vanderbilt.edu) and [Qi Yang](qi.yang@vanderbilt.edu)
 
@@ -112,11 +112,34 @@ Default = on
 
 **--extra\_topup\_args="string”**
 
-Extra arguments to pass to FSL’s `topup`. `Topup` will always run with the following:
+Extra arguments to pass to FSL’s `topup`. `Topup` will run with the following by default (as listed in the `/SUPPLEMENTAL/topup.cnf` configuration file) but will be overwritten by arguments passed to `--extra_topup_args`:
 
-    --subsamp=1,1,1,1,1,1,1,1,1 
+    # Resolution (knot-spacing) of warps in mm
+    --warpres=20,16,14,12,10,6,4,4,4
+    # Subsampling level (a value of 2 indicates that a 2x2x2 neighbourhood is collapsed to 1 voxel)
+    --subsamp=1,1,1,1,1,1,1,1,1
+    # FWHM of gaussian smoothing
+    --fwhm=8,6,4,3,3,2,1,0,0
+    # Maximum number of iterations
     --miter=10,10,10,10,10,20,20,30,30
-    --lambda=3.3e-4,6.7e-5,6.7e-6,1e-6,3.3e-7,3.3e-8,3.3e-9,3.3e-11,6.7e-13
+    # Relative weight of regularisation
+    --lambda=0.00033,0.000067,0.0000067,0.000001,0.00000033,0.000000033,0.0000000033,0.000000000033,0.00000000000067
+    # If set to 1 lambda is multiplied by the current average squared difference
+    --ssqlambda=1
+    # Regularisation model
+    --regmod=bending_energy
+    # If set to 1 movements are estimated along with the field
+    --estmov=1,1,1,1,1,0,0,0,0
+    # 0=Levenberg-Marquardt, 1=Scaled Conjugate Gradient
+    --minmet=0,0,0,0,0,1,1,1,1
+    # Quadratic or cubic splines
+    --splineorder=3
+    # Precision for calculation and storage of Hessian
+    --numprec=double
+    # Linear or spline interpolation
+    --interp=spline
+    # If set to 1 the images are individually scaled to a common mean intensity 
+    --scale=0
 
 For `topup` options that require additional inputs, place the file in the inputs directory and use the following syntax: `--<myinputoption> /INPUTS/<file.ext>`. For `topup` options that produce additional outputs, the file will save in the output directory under the “TOPUP” folder by using the following syntax: `--<myoutputoption> /OUTPUTS/TOPUP/<file.ext>`. Note that in this case `/INPUTS` and `/OUTPUTS` should be named exactly as is and are NOT the path to the input and output directory on your file system.
 
