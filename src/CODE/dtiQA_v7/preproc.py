@@ -1,7 +1,7 @@
-# dtiQA v7.1.3: Preprocessing
+# dtiQA v7.1.4: Preprocessing
 # Leon Cai and Qi Yang
 # MASI Lab
-# July 1, 2020
+# August 5, 2020
 
 # Set Up
 
@@ -158,9 +158,8 @@ def topup(topup_input_b0s_file, topup_acqparams_file, extra_topup_args, topup_di
 
     # Run topup on all b0s
 
-    topup_options = '--subsamp=1,1,1,1,1,1,1,1,1 --miter=10,10,10,10,10,20,20,30,30 --lambda=0.00033,0.000067,0.0000067,0.000001,0.00000033,0.000000033,0.0000000033,0.000000000033,0.00000000000067'
-    topup_cmd = 'topup --verbose --imain={} --datain={} --config=b02b0.cnf --iout={} --out={} --fout={} {} {}'.format(
-        topup_input_b0s_file, topup_acqparams_file, topup_output_b0s_file, topup_results_prefix, topup_output_field_file, topup_options, extra_topup_args)
+    topup_cmd = 'topup --verbose --imain={} --datain={} --config={} --iout={} --out={} --fout={} {}'.format(
+        topup_input_b0s_file, topup_acqparams_file, SHARED_VARS.TOPUP_CNF_FILE, topup_output_b0s_file, topup_results_prefix, topup_output_field_file, extra_topup_args)
     utils.run_cmd(topup_cmd)
 
     print('FINISHED TOPPING UP')

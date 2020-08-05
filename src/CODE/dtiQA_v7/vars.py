@@ -1,7 +1,7 @@
-# dtiQA v7.1.3: Shared Variables
+# dtiQA v7.1.4: Shared Variables
 # Leon Cai and Qi Yang
 # MASI Lab
-# July 1, 2020
+# August 5, 2020
 
 # Set Up
 
@@ -13,7 +13,7 @@ class SharedVars():
 
     def __init__(self):
 
-        # Define necessary directories (CHANGE IF IN SINGULARITY)
+        # Define necessary directories
 
         supplemental_dir = '/SUPPLEMENTAL'
         app_dir = '/APPS'
@@ -27,6 +27,10 @@ class SharedVars():
         # Define Synb0-DisCo variables
 
         self.SYNB0_EXEC_FILE = os.path.join(app_dir, 'synb0', 'synb0.sh')
+
+        # Define topup variables
+
+        self.TOPUP_CNF_FILE = os.path.join(supplemental_dir, 'topup.cnf')
 
         # Define threading variable
 

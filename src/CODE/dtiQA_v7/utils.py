@@ -1,7 +1,7 @@
-# dtiQA v7.1.3: Utilities
+# dtiQA v7.1.4: Utilities
 # Leon Cai and Qi Yang
 # MASI Lab
-# July 1, 2020
+# August 5, 2020
 
 # Set Up
 
