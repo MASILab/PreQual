@@ -25,8 +25,8 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
     print('RENDERING TITLE PAGE')
 
     title_str = \
-    str('Spider: dtiQA v7.1.3 (Multi)\n'
-        'Creation Date: July 1, 2020\n\n'
+    str('Spider: PreQual v1.0.0 (dtiQA v7.1.4 Multi)\n'
+        'Creation Date: August 5, 2020\n\n'
         
         'Authors:\n'
         '- Leon Cai (leon.y.cai@vanderbilt.edu)\n'
