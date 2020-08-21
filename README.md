@@ -4,14 +4,18 @@
 
 [MASI Lab](my.vanderbilt.edu/masi)
 
+## Reference
+
+Leon Y. Cai, Qi Yang, Colin B. Hansen, Vishwesh Nath, Karthik Ramadass, Graham W. Johnson, Benjamin N. Conrad, Brian D. Boyd, John P. Begnoche, Lori L. Beason-Held, Andrea T. Shafer, Susan M. Resnick, Warren D. Taylor, Gavin R. Price, Victoria L. Morgan, Baxter P. Rogers, Kurt G. Schilling, Bennett A. Landman. *PreQual: An automated pipeline for integrated preprocessing and quality assurance of diffusion weighted MRI images*. bioRxiv, 2020. Preprint.
+
 ## Containerization of Source Code
 
     git clone https://github.com/MASILab/PreQual.git
     cd /path/to/repo/PreQual
     git checkout v1.0.0
-    singularity build /path/to/prequal_v1.0.0.simg Singularity
+    sudo singularity build /path/to/prequal_v1.0.0.simg Singularity
 
-We use Singularity version 3.4.
+We use Singularity version 3.4 with root permissions.
 
 ## Command
 
