@@ -1,7 +1,7 @@
-# dtiQA v7.1.4: Visualization
+# PreQual: Visualization
 # Leon Cai and Qi Yang
 # MASI Lab
-# August 5, 2020
+# Vanderbilt University
 
 # Set Up
 
@@ -25,9 +25,9 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
     print('RENDERING TITLE PAGE')
 
     title_str = \
-    str('Spider: PreQual v1.0.0 (dtiQA v7.1.4 Multi)\n'
-        'Creation Date: August 5, 2020\n\n'
-        
+    str('PreQual v{} (dtiQA v7 Multi)\n'
+        'Creation Date: {}\n\n'
+
         'Authors:\n'
         '- Leon Cai (leon.y.cai@vanderbilt.edu)\n'
         '- Qi Yang (qi.yang@vanderbilt.edu)\n\n'
@@ -37,11 +37,12 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
         'Project: {}\n'
         'Subject: {}\n'
         'Session: {}\n'
-        .format(datetime.now(), params['project'], params['subject'], params['session']))
+        .format(SHARED_VARS.VERSION, SHARED_VARS.CREATION_DATE, datetime.now(), params['project'], params['subject'], params['session']))
 
     params_str = \
     str('Parameters:\n'
         '- B-Value Threshold: {}\n'
+        '- Shells: {}\n'
         '- Run Denoise: {}\n'
         '- Run Prenormalize: {}\n'
         '- Try Synb0-DisCo: {}\n'
@@ -53,6 +54,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
         '- Split Outputs: {}\n'
         '- Keep Intermediates: {}\n'
         .format(params['bval_threshold'],
+                params['shells'] if len(params['shells']) > 0 else 'Auto',
                 params['use_denoise'],
                 params['use_prenormalize'],
                 params['use_synb0_user'],

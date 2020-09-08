@@ -1,7 +1,7 @@
-# dtiQA v7.1.4: Preprocessing
+# PreQual: Preprocessing
 # Leon Cai and Qi Yang
 # MASI Lab
-# August 5, 2020
+# Vanderbilt University
 
 # Set Up
 

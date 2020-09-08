@@ -1,7 +1,7 @@
-# dtiQA v7.1.4: Statistics
+# PreQual: Statistics
 # Leon Cai and Qi Yang
 # MASI Lab
-# August 5, 2020
+# Vanderbilt University
 
 # Set Up
 
@@ -174,7 +174,7 @@ def motion(eddy_dir, stats_dir):
 
     return motion_dict, stats_out_list
 
-def cnr(dwi_file, bvals_file, mask_file, eddy_dir, stats_dir):
+def cnr(dwi_file, bvals_file, mask_file, eddy_dir, stats_dir, shells=[]):
 
     # Load CNR data
 
@@ -189,13 +189,16 @@ def cnr(dwi_file, bvals_file, mask_file, eddy_dir, stats_dir):
     cnr_warning_str = ''
 
     if not len(bvals_unique) == eddy_cnr_img.shape[3]:
-        print('NUMBER OF UNIQUE B-VALUES AFTER PREPROCESSING IS NOT EQUAL TO THE NUMBER OF SHELLS DETERMINED BY EDDY. ATTEMPTING TO ROUND B-VALUES TO NEAREST 100 FOR SHELL-WISE SNR/CNR ANALYSIS.')
+        print('NUMBER OF UNIQUE B-VALUES AFTER PREPROCESSING IS NOT EQUAL TO THE NUMBER OF SHELLS DETERMINED BY EDDY. {} FOR SHELL-WISE SNR/CNR ANALYSIS.'.format('ATTEMPTING TO ROUND B-VALUES TO NEAREST 100' if len(shells) == 0 else 'MATCHING B-VALUES TO NEAREST SUPPLIED SHELL'))
         bvals_rounded = []
         for bval in bvals:
-            bvals_rounded.append(_round(bval, 100))
+            if len(shells) > 0:
+                bvals_rounded.append(_nearest(bval, shells))
+            else:
+                bvals_rounded.append(_round(bval, 100))
         bvals_unique = np.sort(np.unique(bvals_rounded))
         bvals = bvals_rounded # will need to return bvals "shelled" for visualization of the volumes to match the SNR/CNR shells
-        cnr_warning_str = 'For SNR/CNR analysis, the number of unique b-values after preprocessing was not equal to the number of shells determined by eddy. B-values were rounded to the nearest 100 for analysis in an attempt to match eddy.'
+        cnr_warning_str = 'For SNR/CNR analysis, the number of unique b-values after preprocessing was not equal to the number of shells determined by eddy. B-values were {} for analysis in an attempt to match eddy.'.format('rounded to the nearest 100' if len(shells) == 0 else 'matched to nearest supplied shell')
     
     if not len(bvals_unique) == eddy_cnr_img.shape[3]:
         raise utils.DTIQAError('NUMBER OF UNIQUE B-VALUES AFTER PREPROCESSING AND ROUNDING TO NEAREST 100 IS NOT EQUAL TO THE NUMBER OF SHELLS DETERMINED BY EDDY. PLEASE ENSURE YOUR DATA IS PROPERLY SHELLED. EXITING.')
@@ -330,6 +333,12 @@ def gradcheck(dwi_file, bvals_file, bvecs_file, mask_file, corr_dir):
     return corrected_bvals_file, corrected_bvecs_file
 
 # Helper Functions
+
+def _nearest(value, array):
+
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return array[idx]
 
 def _round(num, base):
 

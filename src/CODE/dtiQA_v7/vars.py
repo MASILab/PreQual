@@ -1,7 +1,7 @@
-# dtiQA v7.1.4: Shared Variables
+# PreQual: Shared Variables
 # Leon Cai and Qi Yang
 # MASI Lab
-# August 5, 2020
+# Vanderbilt University
 
 # Set Up
 
@@ -47,6 +47,11 @@ class SharedVars():
         self.LABEL_FONTSIZE = 12
         self.PDF_DPI = 600
         self.VIS_PERCENTILE_MAX = 99.9
+
+        # Define versioning and creation date
+
+        self.VERSION = '1.0.0'
+        self.CREATION_DATE = 'September 8, 2020'
 
 # Define instance of SharedVars class that will be accessible to (and editable by) other modules
 

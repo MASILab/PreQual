@@ -1,7 +1,7 @@
-# dtiQA v7.1.4
+# PreQual
 # Leon Cai and Qi Yang
 # MASI Lab
-# August 5, 2020
+# Vanderbilt University
 
 # Set Up
 
@@ -24,11 +24,12 @@ def main():
 
     # DEFINE ARGUMENTS
 
-    parser = ap.ArgumentParser(description='Run dtiQA v7.1 (multi)')
+    parser = ap.ArgumentParser(description='PreQual (dtiQA v7 Multi): An automated pipeline for integrated preprocessing and quality assurance of diffusion weighted MRI images')
     parser.add_argument('in_dir', help='A path to the INPUTS directory that must contain dtiQA_config.csv')
     parser.add_argument('out_dir', help='A path to the OUTPUTS directory')
     parser.add_argument('pe_axis', help='Phase encoding axis (direction agnostic) (i.e. i or j)')
     parser.add_argument('--bval_threshold', metavar='N', default='50', help='Non-negative integer threshold under which to consider a b-value to be 0 (default = 50)')
+    parser.add_argument('--nonzero_shells', metavar='s1,s2,...,sn/auto', default='auto', help='Comma separated list of positive integers indicating nonzero shells for SNR/CNR analysis when there are more unique b-values than shells determined by eddy or automatically determine shells by rounding to nearest 100 (default = auto)')
     parser.add_argument('--denoise', metavar='on/off', default='on', help='Denoise images prior to preprocessing (default = on)')
     parser.add_argument('--prenormalize', metavar='on/off', default='on', help='Normalize intensity distributions before preprocessing (default = on)')
     parser.add_argument('--synb0', metavar='on/off', default='on', help='Run topup with a synthetic b0 generated with Synb0-DisCo if no reverse phase encoded images are supplied and a T1 is supplied (default = on)')
@@ -81,6 +82,18 @@ def main():
         params['bval_threshold'] = int(bval_threshold)
     else:
         raise utils.DTIQAError('INVALID INPUT FOR --bval_threshold PARAMETER. EXITING.')
+
+    if args.nonzero_shells == 'auto':
+        params['shells'] = []
+    else:
+        try:
+            shells = [int(s) for s in args.nonzero_shells.split(',')]
+            if np.amin(shells) < 0:
+                raise utils.DTIQAError('INVALID INPUT FOR --nonzero_shells PARAMETER. EXITING.')
+            shells.append(0)
+            params['shells'] = np.sort(np.unique(shells))
+        except:
+            raise utils.DTIQAError('INVALID INPUT FOR --nonzero_shells PARAMETER. EXITING.')
 
     if args.denoise == 'on':
         params['use_denoise'] = True
@@ -569,7 +582,7 @@ def main():
     chisq_matrix_file = stats.chisq(dwi_preproc_file, dwi_recon_file, chisq_mask_file, stats_dir)
 
     motion_dict, motion_stats_out_list = stats.motion(eddy_dir, stats_dir)
-    cnr_dict, bvals_preproc_shelled, cnr_stats_out_list, cnr_warning_str = stats.cnr(dwi_preproc_file, bvals_preproc_file, mask_file, eddy_dir, stats_dir)
+    cnr_dict, bvals_preproc_shelled, cnr_stats_out_list, cnr_warning_str = stats.cnr(dwi_preproc_file, bvals_preproc_file, mask_file, eddy_dir, stats_dir, shells=params['shells'])
     if not cnr_warning_str == '':
         warning_strs.append(cnr_warning_str)
     
