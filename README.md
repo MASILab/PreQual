@@ -1,4 +1,4 @@
-# PreQual v1.0.0 (dtiQA v7.1.4 Multi) User Guide
+# PreQual (dtiQA v7 Multi) v1.0.0 User Guide
 
 ## Authors and Reference
 
@@ -93,6 +93,12 @@ j | - | 0.1 | 0, -1, 0, 0.1
 A non-negative integer threshold under which to consider a b-value to be zero. Useful when some MRI machines do not allow for more than one b0 volume to be acquired so some users acquire scans with extremely low b-values to be treated like b0 volumes. Setting this value to 0 results in no thresholding. Units = s/mm<sup>2</sup>. 
 
 Default = 50
+
+**--nonzero\_shells s1,s2,...,sn/auto**
+
+A comma separated list of positive integers (s/mm<sup>2</sup>) indicating nonzero shells for SNR/CNR analysis when there are more unique b-values than shells determined by eddy or automatically determine shells by rounding to nearest 100. Useful when b-values are modulated around a shell value instead of set exactly at that value. Only used when determining shells for SNR/CNR analysis. Original b-values used elsewhere in pipeline.
+
+Default = auto
 
 **--denoise on/off**
 
@@ -309,7 +315,7 @@ Default = sess
 
 1. If the user chooses to, we then perform post-normalization in the same fashion as pre-normalization.
 
-1. If the user choose to, we then wrap up preprocessing with an N4 bias field correction as implemented in ANTs via MRTrix3’s dwibiascorrect.
+1. If the user chooses to, we then wrap up preprocessing with an N4 bias field correction as implemented in ANTs via MRTrix3’s dwibiascorrect.
 
 1. We generate a brain mask using FSL’s bet2 with the following options:
 
@@ -359,7 +365,7 @@ Default = sess
 
    1. If bias field correction was performed, we then visualize the calculated fields.
 
-   1. We then visualize some central slices of the average volumes for all unique b-values, including b = 0 and report the median intra-mask SNR or CNR calculated by eddy as appropriate.
+   1. We then visualize some central slices of the average volumes for all unique b-values, including b = 0 and report the median intra-mask SNR or CNR calculated by eddy as appropriate. If there are more unique b-values than shells deteremined by eddy, we round the b-values to the nearest 100 by default to assign volumes to shells or we choose the nearest shell indicated by the user (see `--nonzero_shells`).
 
    1. We visualize the tensors using MRTrix3’s mrview, omitting the tensors with negative eigenvalues or eigenvalues greater than 3 times the ADC of water at 37°C.
 
