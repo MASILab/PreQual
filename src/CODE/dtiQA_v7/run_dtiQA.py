@@ -203,6 +203,7 @@ def main():
     print('- {}'.format('Eddy {}'.format('Only' if not use_topup else '+ Topup ({})'.format('Synb0' if use_synb0 else 'RPE'))))
     print('PARAMETERS:')
     print('- BValue Threshold: {}'.format(params['bval_threshold']))
+    print('- Shells: {}'.format(params['shells']))
     print('- Denoise: {}'.format(params['use_denoise']))
     print('- Prenormalize: {}'.format(params['use_prenormalize']))
     print('- Extra Topup Args: {}'.format(params['extra_topup_args']))
