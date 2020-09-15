@@ -1,5 +1,9 @@
 # PreQual (dtiQA v7 Multi) v1.0.0 User Guide
 
+## Overview
+
+![Pipeline Overview](https://github.com/MASILab/PreQual/blob/master/pipeline_overview.png?raw=true)
+
 ## Authors and Reference
 
 [Leon Y. Cai](mailto:leon.y.cai@vanderbilt.edu), Qi Yang, Colin B. Hansen, Vishwesh Nath, Karthik Ramadass, Graham W. Johnson, Benjamin N. Conrad, Brian D. Boyd, John P. Begnoche, Lori L. Beason-Held, Andrea T. Shafer, Susan M. Resnick, Warren D. Taylor, Gavin R. Price, Victoria L. Morgan, Baxter P. Rogers, Kurt G. Schilling, Bennett A. Landman. *PreQual: An automated pipeline for integrated preprocessing and quality assurance of diffusion weighted MRI images*. bioRxiv, 2020. Preprint.
