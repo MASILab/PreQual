@@ -77,7 +77,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
     method_strs, ref_strs = _methods_strs(use_topup, use_synb0, params)
 
     methods_str = \
-    str('Warnings (See \"dtiQA_v7 Assumptions and User Guide\" for more information):\n\n'
+    str('Warnings (See \"PreQual User Guide\" at github.com/MASILab/PreQual for more information):\n\n'
         
         '- All input volumes must have the same phase encoding axis, as input into this pipeline and as reflected above. Please see the PE Direction page of this PDF for more information.\n'
         '{}'
