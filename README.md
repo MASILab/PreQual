@@ -1,4 +1,4 @@
-# PreQual (dtiQA v7 Multi) v1.0.0 User Guide
+# PreQual (dtiQA v7 Multi) User Guide
 
 ## Overview
 
@@ -14,8 +14,8 @@
 
     git clone https://github.com/MASILab/PreQual.git
     cd /path/to/repo/PreQual
-    git checkout v1.0.0
-    sudo singularity build /path/to/prequal_v1.0.0.simg Singularity
+    git checkout v1.0.1
+    sudo singularity build /path/to/prequal.simg Singularity
 
 We use Singularity version 3.4 with root permissions.
 
@@ -29,7 +29,7 @@ We use Singularity version 3.4 with root permissions.
     -B /tmp:/tmp
     -B /path/to/freesurfer/license.txt:/APPS/freesurfer/license.txt
     --nv
-    /path/to/prequal_v1.0.0.simg
+    /path/to/prequal.simg
     pe_axis
     [options]
     
@@ -168,6 +168,12 @@ Default = off
 Run `eddy` with or without a brain mask. If on, FSL’s brain extraction tool (`bet`) is used with a low threshold to create a rough brain mask for `eddy`. This can sometimes produce poor results. If off, no mask is used and produces empirically minor differences in results than when a mask is used. If this option is on, the contour of this mask is drawn in the PDF.
 
 Default = on
+
+**--eddy\_bval\_scale N/off**
+
+Run `eddy` with b-values scaled by the positive number N. All other steps of the pipeline use the original b-values. This can help `eddy` finish distortion correction when extremely low b-values (<200) are involved. If off, no scaling of b-values is used.
+
+Default = off
 
 **--extra\_eddy\_args="string”**
 

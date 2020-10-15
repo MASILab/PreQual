@@ -566,6 +566,19 @@ def dwi_smooth(dwi_file, smooth_dir):
 
     return dwi_smooth_file
 
+def bvals_scale(bvals_file, scale_factor, scaled_dir):
+
+    bvals_prefix = get_prefix(bvals_file, file_ext='bval')
+
+    print('SCALING {} BVALS BY {}'.format(bvals_prefix, scale_factor))
+
+    bvals = load_txt(bvals_file, txt_type='bvals')
+    bvals_scaled = scale_factor * bvals
+    bvals_scaled_file = os.path.join(scaled_dir, '{}_x{}.bval'.format(bvals_prefix, scale_factor))
+    save_txt(bvals_scaled, bvals_scaled_file)
+
+    return bvals_scaled_file
+
 # Function Definitions: Phase Encoding Scheme Manipulation
 
 def pescheme2params(pe_axis, pe_dir, readout_time):

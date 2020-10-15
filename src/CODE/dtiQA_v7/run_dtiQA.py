@@ -36,6 +36,7 @@ def main():
     parser.add_argument('--extra_topup_args', metavar='string', default='', help='Extra arguments to pass to topup')
     parser.add_argument('--eddy_cuda', metavar='8.0/9.1/off', default='off', help='Run eddy with CUDA 8.0 or 9.1 or without GPU acceleration and with OPENMP only (default = off)')
     parser.add_argument('--eddy_mask', metavar='on/off', default='on', help='Use a brain mask for eddy (default = on)')
+    parser.add_argument('--eddy_bval_scale', metavar='N/off', default='off', help='Positive number with which to scale b-values for eddy only in order to perform distortion correction on super low shells (default = off)')
     parser.add_argument('--extra_eddy_args', metavar='string', default='', help='Extra arguments to pass to eddy')
     parser.add_argument('--postnormalize', metavar='on/off', default='off', help='Normalize intensity distributions after preprocessing (default = off)')
     parser.add_argument('--correct_bias', metavar='on/off', default='off', help='Perform N4 bias field correction as implemented in ANTS (default = off)')
@@ -136,6 +137,15 @@ def main():
     else:
         raise utils.DTIQAError('INVALID INPUT FOR --eddy_mask PARAMETER. EXITING.')
 
+    eddy_bval_scale = args.eddy_bval_scale
+    if eddy_bval_scale == 'off':
+        eddy_bval_scale = 1
+    eddy_bval_scale = float(eddy_bval_scale)
+    if eddy_bval_scale > 0:
+        params['eddy_bval_scale'] = eddy_bval_scale
+    else:
+        raise utils.DTIQAError('INVALID INPUT FOR --eddy_bval_scale PARAMETER. EXITING.')
+
     params['extra_eddy_args'] = args.extra_eddy_args
     if len(params['extra_eddy_args']) > 0:
         warning_strs.append('Additional inputs given to eddy. These are untested and may produce pipeline failure or inaccurate results.')
@@ -209,6 +219,7 @@ def main():
     print('- Extra Topup Args: {}'.format(params['extra_topup_args']))
     print('- Eddy CUDA: {}'.format(params['eddy_cuda_version']))
     print('- Eddy Mask Type: {}'.format(params['eddy_mask_type']))
+    print('- Eddy BValue Scale: {}'.format(params['eddy_bval_scale']))
     print('- Extra Eddy Args: {}'.format(params['extra_eddy_args']))
     print('- Postnormalize: {}'.format(params['use_postnormalize']))
     print('- N4 Bias Correction: {}'.format(params['use_unbias']))
@@ -349,7 +360,7 @@ def main():
     eddy_dir = utils.make_dir(out_dir, 'EDDY')
     
     topup_input_b0s_file, topup_acqparams_file, b0_d_file, b0_syn_file, eddy_input_dwi_file, eddy_input_bvals_file, eddy_input_bvecs_file, eddy_acqparams_file, eddy_index_file = \
-        preproc.prep(dwi_prenorm_files, bvals_checked_files, bvecs_checked_files, pe_axis, pe_dirs, readout_times, use_topup, use_synb0, t1_file, topup_dir, eddy_dir)
+        preproc.prep(dwi_prenorm_files, bvals_checked_files, bvecs_checked_files, pe_axis, pe_dirs, readout_times, use_topup, use_synb0, t1_file, topup_dir, eddy_dir, params['eddy_bval_scale'])
 
     tf = time.time()
     dt = round(tf - ti)
@@ -394,7 +405,7 @@ def main():
     ti = time.time()
 
     eddy_output_dwi_file, eddy_output_bvals_file, eddy_output_bvecs_file, eddy_mask_file, eddy_warning_str = \
-        preproc.eddy(eddy_input_dwi_file, eddy_input_bvals_file, eddy_input_bvecs_file, eddy_acqparams_file, eddy_index_file, params['eddy_mask_type'], params['eddy_cuda_version'], topup_results_prefix, topup_output_b0s_file, params['extra_eddy_args'], eddy_dir)
+        preproc.eddy(eddy_input_dwi_file, eddy_input_bvals_file, eddy_input_bvecs_file, eddy_acqparams_file, eddy_index_file, params['eddy_mask_type'], params['eddy_cuda_version'], params['eddy_bval_scale'], topup_results_prefix, topup_output_b0s_file, params['extra_eddy_args'], eddy_dir)
     if not eddy_warning_str == '':
         warning_strs.append(eddy_warning_str)
 

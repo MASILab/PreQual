@@ -48,6 +48,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
         '- Try Synb0-DisCo: {}\n'
         '- Extra Topup Args: {}\n'
         '- Eddy Mask: {}\n'
+        '- Eddy B-Value Scale: {}\n'
         '- Extra Eddy Args: {}\n'
         '- Run Postnormalize: {}\n'
         '- Run N4 Bias Field Correction: {}\n'
@@ -60,6 +61,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
                 params['use_synb0_user'],
                 params['extra_topup_args'],
                 True if params['eddy_mask_type'] == 'brain' else False,
+                params['eddy_bval_scale'],
                 params['extra_eddy_args'],
                 params['use_postnormalize'],
                 params['use_unbias'],

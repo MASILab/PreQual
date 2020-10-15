@@ -16,7 +16,7 @@ from vars import SHARED_VARS
 
 # Define Preprocessing Functions
 
-def prep(dwi_files, bvals_files, bvecs_files, pe_axis, pe_dirs, readout_times, use_topup, use_synb0, t1_file, topup_dir, eddy_dir):
+def prep(dwi_files, bvals_files, bvecs_files, pe_axis, pe_dirs, readout_times, use_topup, use_synb0, t1_file, topup_dir, eddy_dir, eddy_bval_scale):
 
     print('PREPARING FOR PREPROCESSING...')
 
@@ -25,6 +25,8 @@ def prep(dwi_files, bvals_files, bvecs_files, pe_axis, pe_dirs, readout_times, u
     eddy_input_prefix = 'preproc_input'
     eddy_input_dwi_file = utils.dwi_merge(dwi_files, eddy_input_prefix, eddy_dir)
     eddy_input_bvals_file = utils.bvals_merge(bvals_files, eddy_input_prefix, eddy_dir)
+    if not eddy_bval_scale == 1: # If we need to scale b-values for eddy, do so here
+        eddy_input_bvals_file = utils.bvals_scale(eddy_input_bvals_file, float(eddy_bval_scale), eddy_dir)
     eddy_input_bvecs_file = utils.bvecs_merge(bvecs_files, eddy_input_prefix, eddy_dir)
 
     # Set up data for acqparams and eddy_index files
@@ -166,7 +168,7 @@ def topup(topup_input_b0s_file, topup_acqparams_file, extra_topup_args, topup_di
 
     return topup_results_prefix, topup_output_b0s_file
 
-def eddy(eddy_input_dwi_file, eddy_input_bvals_file, eddy_input_bvecs_file, eddy_acqparams_file, eddy_index_file, eddy_mask_type, eddy_cuda_version, topup_results_prefix, topup_output_b0s_file, extra_eddy_args, eddy_dir):
+def eddy(eddy_input_dwi_file, eddy_input_bvals_file, eddy_input_bvecs_file, eddy_acqparams_file, eddy_index_file, eddy_mask_type, eddy_cuda_version, eddy_bval_scale, topup_results_prefix, topup_output_b0s_file, extra_eddy_args, eddy_dir):
 
     print('RUNNING EDDY...')
 
@@ -232,6 +234,8 @@ def eddy(eddy_input_dwi_file, eddy_input_bvals_file, eddy_input_bvecs_file, eddy
 
     utils.move_file('{}.nii.gz'.format(eddy_results_prefix), eddy_output_dwi_file)
     utils.copy_file(eddy_input_bvals_file, eddy_output_bvals_file)
+    if not eddy_bval_scale == 1: # If we need to undo scaling b-values for eddy, do so here
+        eddy_output_bvals_file = utils.bvals_scale(eddy_output_bvals_file, float(1)/float(eddy_bval_scale), eddy_dir)
     utils.copy_file('{}.eddy_rotated_bvecs'.format(eddy_results_prefix), eddy_output_bvecs_file)
 
     # Document warnings
