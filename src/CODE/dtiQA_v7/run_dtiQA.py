@@ -24,7 +24,7 @@ def main():
 
     # DEFINE ARGUMENTS
 
-    parser = ap.ArgumentParser(description='PreQual (dtiQA v7 Multi): An automated pipeline for integrated preprocessing and quality assurance of diffusion weighted MRI images')
+    parser = ap.ArgumentParser(description='PreQual (dtiQA v7 Multi) v{}: An automated pipeline for integrated preprocessing and quality assurance of diffusion weighted MRI images. For citation, user guide, and license, please visit github.com/MASILab/PreQual. Created {}.'.format(SHARED_VARS.VERSION, SHARED_VARS.CREATION_DATE))
     parser.add_argument('in_dir', help='A path to the INPUTS directory that must contain dtiQA_config.csv')
     parser.add_argument('out_dir', help='A path to the OUTPUTS directory')
     parser.add_argument('pe_axis', help='Phase encoding axis (direction agnostic) (i.e. i or j)')
