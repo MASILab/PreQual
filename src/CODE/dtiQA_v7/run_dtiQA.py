@@ -571,7 +571,7 @@ def main():
 
     scalars_dir = utils.make_dir(out_dir, 'SCALARS')
 
-    fa_file, md_file = preproc.scalars(tensor_file, mask_file, scalars_dir)
+    fa_file, md_file, ad_file, rd_file = preproc.scalars(tensor_file, mask_file, scalars_dir)
 
     tf = time.time()
     dt = round(tf - ti)
@@ -598,7 +598,7 @@ def main():
     if not cnr_warning_str == '':
         warning_strs.append(cnr_warning_str)
     
-    roi_names, roi_avg_fa, atlas_ants_fa_file, cc_center_voxel, fa_stats_out_list = stats.fa_info(fa_file, stats_dir)
+    roi_names, roi_med_fa, atlas_ants_fa_file, cc_center_voxel, fa_stats_out_list = stats.scalar_info(fa_file, md_file, ad_file, rd_file, stats_dir)
 
     stats.stats_out(motion_stats_out_list, cnr_stats_out_list, fa_stats_out_list, stats_dir)
 
@@ -645,7 +645,7 @@ def main():
     dwi_vis_files = vis.vis_dwi(dwi_preproc_file, bvals_preproc_shelled, bvecs_preproc_file, cnr_dict, vis_dir)
     tensor_vis_file = vis.vis_tensor(tensor_file, fa_file, cc_center_voxel, vis_dir)
     fa_vis_file = vis.vis_scalar(fa_file, vis_dir, name='FA')
-    fa_stats_vis_file = vis.vis_fa_stats(roi_names, roi_avg_fa, fa_file, atlas_ants_fa_file, vis_dir)
+    fa_stats_vis_file = vis.vis_fa_stats(roi_names, roi_med_fa, fa_file, atlas_ants_fa_file, vis_dir)
     md_vis_file = vis.vis_scalar(md_file, vis_dir, name='MD')
 
     # Combine component PDFs

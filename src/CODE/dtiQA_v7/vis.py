@@ -13,7 +13,7 @@ import nibabel as nib
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as mcm
-from mpl_toolkits.mplot3d import Axes3D
+#from mpl_toolkits.mplot3d import Axes3D
 
 import utils
 from vars import SHARED_VARS
@@ -588,6 +588,8 @@ def vis_gradcheck(bvals_files, bvecs_files, bvals_preproc_file, bvecs_preproc_fi
 
     print('VISUALIZING GRADIENT CHECK')
 
+    # Load and prepare gradients
+
     bvals = utils.load_txt(utils.bvals_merge(bvals_files, 'raw_merged', temp_dir), txt_type='bvals')
     bvecs = utils.load_txt(utils.bvecs_merge(bvecs_files, 'raw_merged', temp_dir), txt_type='bvecs')
 
@@ -600,17 +602,19 @@ def vis_gradcheck(bvals_files, bvecs_files, bvals_preproc_file, bvecs_preproc_fi
     scaled_bvecs_preproc = np.array([np.multiply(bvals_preproc, bvecs_preproc[0, :]), np.multiply(bvals_preproc, bvecs_preproc[1, :]), np.multiply(bvals_preproc, bvecs_preproc[2, :])])
     scaled_bvecs_corrected = np.array([np.multiply(bvals_corrected, bvecs_corrected[0, :]), np.multiply(bvals_corrected, bvecs_corrected[1, :]), np.multiply(bvals_corrected, bvecs_corrected[2, :])])
 
+    # Visualize
+
     gradcheck_vis_file = os.path.join(vis_dir, 'gradcheck.pdf')
 
     fig = plt.figure(0, figsize=SHARED_VARS.PAGESIZE)
     
-    ax = fig.add_subplot(111, projection='3d')
+    ax = plt.axes(projection='3d')
     ax.scatter(scaled_bvecs[0, :], scaled_bvecs[1, :], scaled_bvecs[2, :], c='r', marker='o', label='Original')
     ax.scatter(scaled_bvecs_preproc[0, :], scaled_bvecs_preproc[1, :], scaled_bvecs_preproc[2, :], c='b', marker='x', label='Preprocessed')
     ax.scatter(scaled_bvecs_corrected[0, :], scaled_bvecs_corrected[1, :], scaled_bvecs_corrected[2, :], c='g', marker='+', label='Preprocessed + Optimized')
     plt.title('Gradient Check', fontsize=SHARED_VARS.TITLE_FONTSIZE)
     plt.legend(fontsize=SHARED_VARS.LABEL_FONTSIZE)
-    
+
     plt.tight_layout()
 
     plt.subplots_adjust(bottom=0.2)
@@ -618,6 +622,12 @@ def vis_gradcheck(bvals_files, bvecs_files, bvals_preproc_file, bvecs_preproc_fi
     info_str = '- Original: Raw gradients (b-vectors scaled by b-value) given as input.\n- Preprocessed: Gradients output and rotated by eddy. Often slightly different than the original gradients.\n- Preprocessed + Optimized: Preprocessed gradients that have been sign and order permuted to produce the optimal tract length as determined by dwigradcheck in MRTrix3. Ideally identical to the preprocessed gradients. If not, this suggests an incorrect sign or axis permutation in the b-vectors. Glyph visualization on the Tensor page of this PDF can help support this.'
     plt.text(0, 0, info_str, ha='left', va='bottom', wrap=True, fontsize=SHARED_VARS.LABEL_FONTSIZE)
     plt.axis('off')
+
+    ax.set_box_aspect([1,1,1]) # Make sure axes have equal aspect ratios
+    ax_radius = 1.1*np.amax(bvals)
+    ax.set_xlim3d((-ax_radius, ax_radius))
+    ax.set_ylim3d((-ax_radius, ax_radius))
+    ax.set_zlim3d((-ax_radius, ax_radius))
 
     plt.savefig(gradcheck_vis_file, dpi=SHARED_VARS.PDF_DPI)
     plt.close()
@@ -674,7 +684,7 @@ def vis_scalar(scalar_file, vis_dir, name='?'):
     
     return scalar_vis_file
 
-def vis_fa_stats(roi_names, roi_avg_fa, fa_file, atlas_ants_fa_file, vis_dir):
+def vis_fa_stats(roi_names, roi_med_fa, fa_file, atlas_ants_fa_file, vis_dir):
 
     print('VISUALIZING FA STATISTICS')
 
@@ -689,9 +699,9 @@ def vis_fa_stats(roi_names, roi_avg_fa, fa_file, atlas_ants_fa_file, vis_dir):
     plt.figure(0, figsize=SHARED_VARS.PAGESIZE)
 
     plt.subplot(1, 2, 1)
-    plt.barh(roi_names, roi_avg_fa, height=0.5)
+    plt.barh(roi_names, roi_med_fa, height=0.5)
     plt.xticks(fontsize=SHARED_VARS.LABEL_FONTSIZE)
-    plt.title('Average FA per ROI', fontsize=SHARED_VARS.TITLE_FONTSIZE)
+    plt.title('Median FA per ROI', fontsize=SHARED_VARS.TITLE_FONTSIZE)
     plt.grid()
 
     plt.subplot(3, 2, 2)

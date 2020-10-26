@@ -230,7 +230,7 @@ def cnr(dwi_file, bvals_file, mask_file, eddy_dir, stats_dir, shells=[]):
 
     return cnr_dict, bvals, stats_out_list, cnr_warning_str
 
-def fa_info(fa_file, stats_dir):
+def scalar_info(fa_file, md_file, ad_file, rd_file, stats_dir):
 
     print('EXTRACTING AVERAGE FA PER ROI AND LOCATION OF CORPUS CALLOSUM')
 
@@ -252,9 +252,12 @@ def fa_info(fa_file, stats_dir):
                                                                                                       atlas_ants_fa_file)
     utils.run_cmd(applyreg_cmd)
 
-    print('EXTRACTING ROIS FROM REGISTERED ATLAS')
+    print('PREPARING SCALAR VOLUMES AND ROIS FROM REGISTERED ATLAS')
 
     fa_img, _, _ = utils.load_nii(fa_file, ndim=3)
+    md_img, _, _ = utils.load_nii(md_file, ndim=3)
+    ad_img, _, _ = utils.load_nii(ad_file, ndim=3)
+    rd_img, _, _ = utils.load_nii(rd_file, ndim=3)
     atlas_ants_fa_img, _, _ = utils.load_nii(atlas_ants_fa_file, ndim=3)
 
     roi_names = []
@@ -263,19 +266,58 @@ def fa_info(fa_file, stats_dir):
             line = line.strip('\n')
             roi_names.append(line)
 
-    roi_avg_fa = []
+    print('EXTRACTING ROI-WISE SCALAR VALUES')
+
+    roi_med_fa = []
+    roi_med_md = []
+    roi_med_ad = []
+    roi_med_rd = []
     for i in range(0, len(roi_names)):
         roi_val = i + 1
         index = atlas_ants_fa_img == roi_val
-        avg_fa = np.nanmean(fa_img[index])
-        roi_avg_fa.append(avg_fa)
+        roi_med_fa.append(np.nanmedian(fa_img[index]))
+        roi_med_md.append(np.nanmedian(md_img[index]))
+        roi_med_ad.append(np.nanmedian(ad_img[index]))
+        roi_med_rd.append(np.nanmedian(rd_img[index]))
 
-    roi_avg_fa_list = []
+    roi_med_fa_list = []
+    roi_med_md_list = []
+    roi_med_ad_list = []
+    roi_med_rd_list = []
     for i in range(0, len(roi_names)):
-        roi_avg_fa_list.append('{} {}'.format(roi_names[i], roi_avg_fa[i]))
+        roi_med_fa_list.append('{} {}'.format(roi_names[i], roi_med_fa[i]))
+        roi_med_md_list.append('{} {}'.format(roi_names[i], roi_med_md[i]))
+        roi_med_ad_list.append('{} {}'.format(roi_names[i], roi_med_ad[i]))
+        roi_med_rd_list.append('{} {}'.format(roi_names[i], roi_med_rd[i]))
 
-    roi_avg_fa_file = os.path.join(stats_dir, 'roi_avg_fa.txt')
-    utils.write_str('\n'.join(roi_avg_fa_list), roi_avg_fa_file)
+    roi_med_fa_file = os.path.join(stats_dir, 'roi_med_fa.txt')
+    utils.write_str('\n'.join(roi_med_fa_list), roi_med_fa_file)
+
+    roi_med_md_file = os.path.join(stats_dir, 'roi_med_md.txt')
+    utils.write_str('\n'.join(roi_med_md_list), roi_med_md_file)
+
+    roi_med_ad_file = os.path.join(stats_dir, 'roi_med_ad.txt')
+    utils.write_str('\n'.join(roi_med_ad_list), roi_med_ad_file)
+
+    roi_med_rd_file = os.path.join(stats_dir, 'roi_med_rd.txt')
+    utils.write_str('\n'.join(roi_med_rd_list), roi_med_rd_file)
+
+    # Format scalar info for consolidated stats
+
+    stats_out_list = []
+    for i in range(0, len(roi_names)):
+        stats_out_list.append('{}_med_fa,{}'.format(roi_names[i], roi_med_fa[i]))
+    for i in range(0, len(roi_names)):
+        stats_out_list.append('{}_med_md,{}'.format(roi_names[i], roi_med_md[i]))
+    for i in range(0, len(roi_names)):
+        stats_out_list.append('{}_med_ad,{}'.format(roi_names[i], roi_med_ad[i]))
+    for i in range(0, len(roi_names)):
+        stats_out_list.append('{}_med_rd,{}'.format(roi_names[i], roi_med_rd[i]))
+
+    print('CLEANING UP TEMP DIRECTORY')
+    utils.remove_dir(temp_dir)
+
+    # Localize CC for visualization
 
     cc_genu_val = 3 # taken from label.txt
     cc_splenium_val = 5
@@ -283,16 +325,7 @@ def fa_info(fa_file, stats_dir):
     cc_locs = np.column_stack(np.where(cc_index))
     cc_center_voxel = (np.nanmean(cc_locs[:, 0]), np.nanmean(cc_locs[:, 1]), np.nanmean(cc_locs[:, 2]))
 
-    # Format for consolidated stats
-
-    stats_out_list = []
-    for i in range(0, len(roi_names)):
-        stats_out_list.append('{}_avg_fa,{}'.format(roi_names[i], roi_avg_fa[i]))
-
-    print('CLEANING UP TEMP DIRECTORY')
-    utils.remove_dir(temp_dir)
-
-    return roi_names, roi_avg_fa, atlas_ants_fa_file, cc_center_voxel, stats_out_list
+    return roi_names, roi_med_fa, atlas_ants_fa_file, cc_center_voxel, stats_out_list
 
 def stats_out(motion_stats_out_list, cnr_stats_out_list, fa_stats_out_list, stats_dir):
     

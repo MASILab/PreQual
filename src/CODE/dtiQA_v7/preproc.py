@@ -336,9 +336,9 @@ def scalars(tensor_file, mask_file, scalars_dir):
     print('CONVERTING TENSOR TO V1...')
 
     v1_file = os.path.join(scalars_dir, '{}_v1.nii.gz'.format(tensor_prefix))
-    v1_cmd = 'tensor2metric {} -vector {} -num 1 -mask {} -force -nthreads {}'.format(tensor_file, v1_file, mask_file, SHARED_VARS.NUM_THREADS - 1)
+    v1_cmd = 'tensor2metric {} -vector {} -num 1 -modulate none -mask {} -force -nthreads {}'.format(tensor_file, v1_file, mask_file, SHARED_VARS.NUM_THREADS - 1)
     utils.run_cmd(v1_cmd)
 
     print('ALL SCALARS GENERATED')
 
-    return fa_file, md_file
+    return fa_file, md_file, ad_file, rd_file
