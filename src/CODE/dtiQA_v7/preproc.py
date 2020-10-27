@@ -341,4 +341,4 @@ def scalars(tensor_file, mask_file, scalars_dir):
 
     print('ALL SCALARS GENERATED')
 
-    return fa_file, md_file, ad_file, rd_file
+    return fa_file, md_file, ad_file, rd_file, v1_file

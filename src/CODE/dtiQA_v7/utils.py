@@ -265,6 +265,21 @@ def dwi_denoise(dwi_file, denoised_dir):
 
     return dwi_denoised_file, denoise_warning_str
 
+def dwi_degibbs(dwi_file, degibbs_dir):
+
+    dwi_prefix = get_prefix(dwi_file, file_ext='nii')
+
+    print('REMOVING GIBBS ARTIFACTS FROM {}...'.format(dwi_prefix))
+
+    dwi_degibbs_file = os.path.join(degibbs_dir, '{}_degibbs.nii.gz'.format(dwi_prefix))
+    degibbs_cmd = 'mrdegibbs {} {} -force -nthreads {}'.format(dwi_file, dwi_degibbs_file, SHARED_VARS.NUM_THREADS-1)
+    run_cmd(degibbs_cmd)
+    degibbs_warning_str = 'Gibbs de-ringing applied to {}. Because it can be unstable for partial Fourier acquisitions, we do NOT recommend this for most EPI images. It can also be very difficult to QA, so please carefully check the data in the DEGIBBS output folder.'.format(dwi_prefix)
+
+    print('FINISHED DEGIBBS {}'.format(dwi_prefix))
+
+    return dwi_degibbs_file, degibbs_warning_str
+
 def dwi_unbias(dwi_file, bvals_file, bvecs_file, unbias_dir):
 
     temp_dir = make_dir(unbias_dir, 'TEMP')

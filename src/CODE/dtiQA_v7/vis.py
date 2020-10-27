@@ -43,6 +43,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
     str('Parameters:\n'
         '- B-Value Threshold: {}\n'
         '- Shells: {}\n'
+        '- Run Degibbs: {}\n'
         '- Run Denoise: {}\n'
         '- Run Prenormalize: {}\n'
         '- Try Synb0-DisCo: {}\n'
@@ -52,10 +53,12 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
         '- Extra Eddy Args: {}\n'
         '- Run Postnormalize: {}\n'
         '- Run N4 Bias Field Correction: {}\n'
+        '- Glyph Visualization Type: {}\n'
         '- Split Outputs: {}\n'
         '- Keep Intermediates: {}\n'
         .format(params['bval_threshold'],
                 params['shells'] if len(params['shells']) > 0 else 'Auto',
+                params['use_degibbs'],
                 params['use_denoise'],
                 params['use_prenormalize'],
                 params['use_synb0_user'],
@@ -65,6 +68,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
                 params['extra_eddy_args'],
                 params['use_postnormalize'],
                 params['use_unbias'],
+                params['glyph_type'],
                 params['split_outputs'],
                 params['keep_intermediates']))
 
@@ -614,20 +618,19 @@ def vis_gradcheck(bvals_files, bvecs_files, bvals_preproc_file, bvecs_preproc_fi
     ax.scatter(scaled_bvecs_corrected[0, :], scaled_bvecs_corrected[1, :], scaled_bvecs_corrected[2, :], c='g', marker='+', label='Preprocessed + Optimized')
     plt.title('Gradient Check', fontsize=SHARED_VARS.TITLE_FONTSIZE)
     plt.legend(fontsize=SHARED_VARS.LABEL_FONTSIZE)
-
-    plt.tight_layout()
-
-    plt.subplots_adjust(bottom=0.2)
-    fig.add_axes([0.025, 0.05, 0.95, 0.15])
-    info_str = '- Original: Raw gradients (b-vectors scaled by b-value) given as input.\n- Preprocessed: Gradients output and rotated by eddy. Often slightly different than the original gradients.\n- Preprocessed + Optimized: Preprocessed gradients that have been sign and order permuted to produce the optimal tract length as determined by dwigradcheck in MRTrix3. Ideally identical to the preprocessed gradients. If not, this suggests an incorrect sign or axis permutation in the b-vectors. Glyph visualization on the Tensor page of this PDF can help support this.'
-    plt.text(0, 0, info_str, ha='left', va='bottom', wrap=True, fontsize=SHARED_VARS.LABEL_FONTSIZE)
-    plt.axis('off')
-
     ax.set_box_aspect([1,1,1]) # Make sure axes have equal aspect ratios
     ax_radius = 1.1*np.amax(bvals)
     ax.set_xlim3d((-ax_radius, ax_radius))
     ax.set_ylim3d((-ax_radius, ax_radius))
     ax.set_zlim3d((-ax_radius, ax_radius))
+
+    plt.tight_layout()
+
+    plt.subplots_adjust(bottom=0.2)
+    fig.add_axes([0.025, 0.05, 0.95, 0.15])
+    info_str = '- Original: Raw gradients (b-vectors scaled by b-value) given as input.\n- Preprocessed: Gradients output and rotated by eddy. Often slightly different than the original gradients.\n- Preprocessed + Optimized: Preprocessed gradients that have been sign and order permuted to produce the optimal tract length as determined by dwigradcheck in MRTrix3. Ideally identical to the preprocessed gradients. If not, this suggests an incorrect sign or axis permutation in the b-vectors. Tensor or vector glyph visualization in this PDF can help support this.'
+    plt.text(0, 0, info_str, ha='left', va='bottom', wrap=True, fontsize=SHARED_VARS.LABEL_FONTSIZE)
+    plt.axis('off')
 
     plt.savefig(gradcheck_vis_file, dpi=SHARED_VARS.PDF_DPI)
     plt.close()
@@ -728,15 +731,17 @@ def vis_fa_stats(roi_names, roi_med_fa, fa_file, atlas_ants_fa_file, vis_dir):
 
     return fa_stats_vis_file
 
-def vis_tensor(tensor_file, fa_file, cc_center_voxel, vis_dir):
+def vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_type='tensor'):
 
     print('VISUALIZING TENSORS')
 
     temp_dir = utils.make_dir(vis_dir, 'TEMP')
 
-    tensor_filtered_file = _filter_tensor(tensor_file, temp_dir)
+    # Prepare mrview command: Location to visualize
 
     cc_center_voxel_str = ','.join([str(np.round(loc)) for loc in cc_center_voxel])
+
+    # Prepare mrview command: Planes to visualize + correspondence with file names
 
     planes = {
         0: 'sagittal',
@@ -744,17 +749,35 @@ def vis_tensor(tensor_file, fa_file, cc_center_voxel, vis_dir):
         2: 'axial'
     }
 
+    # Prepare mrview command: Glyphs, either tensor or v1
+
+    bad_adc_mask_nii = _bad_adc_nii_mask(tensor_file, temp_dir)
+    if glyph_type == 'tensor':
+        tensor_filtered_file = _filter_bad_adc(tensor_file, bad_adc_mask_nii, temp_dir)
+        glyph_file = tensor_filtered_file
+        glyph_load_str = '-odf.load_tensor'
+        glyph_title_str = 'Tensors'
+    elif glyph_type == 'vector':
+        v1_filtered_file = _filter_bad_adc(v1_file, bad_adc_mask_nii, temp_dir)
+        glyph_file = v1_filtered_file
+        glyph_load_str = '-fixel.load'
+        glyph_title_str = 'Principal Eigenvectors'
+
+    # Generate mrview commands and plot glyphs
+
     for i in planes:
-        vis_cmd = 'mrview -load {} -odf.load_tensor {} -mode 1 -plane {} -fov 160 -voxel {} -focus 0 -size 1200,1200 -capture.folder {} -capture.prefix {} -capture.grab -noannotations -exit -nthreads {}'.format(
-            fa_file, tensor_filtered_file, i, cc_center_voxel_str, temp_dir, planes[i], SHARED_VARS.NUM_THREADS-1
+        vis_cmd = 'mrview -load {} {} {} -mode 1 -plane {} -fov 160 -voxel {} -focus 0 -size 1200,1200 -capture.folder {} -capture.prefix {} -capture.grab -noannotations -exit -nthreads {}'.format(
+            fa_file, glyph_load_str, glyph_file, i, cc_center_voxel_str, temp_dir, planes[i], SHARED_VARS.NUM_THREADS-1
         )
         utils.run_cmd(vis_cmd) # will save as '<planes[i]>0000.png'
-        vis_zoom_cmd = 'mrview -load {} -odf.load_tensor {} -mode 1 -plane {} -fov 80 -voxel {} -focus 0 -size 1200,1200 -capture.folder {} -capture.prefix {} -capture.grab -noannotations -exit -nthreads {}'.format(
-            fa_file, tensor_filtered_file, i, cc_center_voxel_str, temp_dir, '{}_zoom'.format(planes[i]), SHARED_VARS.NUM_THREADS-1 # will save as 'planes[i]_zoom0000.png'
+        vis_zoom_cmd = 'mrview -load {} {} {} -mode 1 -plane {} -fov 80 -voxel {} -focus 0 -size 1200,1200 -capture.folder {} -capture.prefix {} -capture.grab -noannotations -exit -nthreads {}'.format(
+            fa_file, glyph_load_str, glyph_file, i, cc_center_voxel_str, temp_dir, '{}_zoom'.format(planes[i]), SHARED_VARS.NUM_THREADS-1 # will save as 'planes[i]_zoom0000.png'
         )
         utils.run_cmd(vis_zoom_cmd)
 
-    tensor_vis_file = os.path.join(vis_dir, 'tensors.pdf')
+    # Put PDF page together
+
+    glyph_vis_file = os.path.join(vis_dir, 'glyphs.pdf')
 
     plt.figure(0, figsize=SHARED_VARS.PAGESIZE)
 
@@ -795,14 +818,14 @@ def vis_tensor(tensor_file, fa_file, cc_center_voxel, vis_dir):
 
     plt.tight_layout()
 
-    plt.suptitle('Tensors (Non-physiologic Eigenvalues Omitted)', fontsize=SHARED_VARS.TITLE_FONTSIZE)
-    plt.savefig(tensor_vis_file, dpi=SHARED_VARS.PDF_DPI)
+    plt.suptitle('{} (Non-physiologic Eigenvalues Omitted)'.format(glyph_title_str), fontsize=SHARED_VARS.TITLE_FONTSIZE)
+    plt.savefig(glyph_vis_file, dpi=SHARED_VARS.PDF_DPI)
     plt.close()
 
     print('CLEANING UP TEMP DIRECTORY')
     utils.remove_dir(temp_dir)
 
-    return tensor_vis_file
+    return glyph_vis_file
 
 # Helper Functions
 
@@ -820,6 +843,11 @@ def _methods_strs(use_topup, use_synb0, params):
 
     s.append('First, any volumes with a corresponding b value less than {} were treated as b0 volumes for the remainder of the pipeline.'.format(params['bval_threshold']))
     
+    if params['use_degibbs']:
+        s.append('Gibbs de-ringing followed with the local subvoxel-shifts method [{}].'.format(c))
+        r.append('[{}] Kellner, E. et al. (2016). Gibbs‐ringing artifact removal based on local subvoxel‐shifts. Magnetic resonance in medicine, 76(5), 1574-1581.'.format(c))
+        c += 1
+
     if params['use_denoise']:
         s.append('Then, the diffusion data were denoised with the provided dwidenoise function included with MRTrix3 [{}][{}][{}].'.format(c, c+1, c+2))
         r.append('[{}] Veraart, J. et al. (2016). Denoising of diffusion MRI using random matrix theory. Neuroimage, 142, 394-406.'.format(c))
@@ -963,11 +991,9 @@ def _str2list(string):
             row.append(int(string[i]))
     return row
 
-def _filter_tensor(tensor_file, filter_dir):
+def _bad_adc_nii_mask(tensor_file, filter_dir):
 
-    tensor_prefix = utils.get_prefix(tensor_file)
-
-    print('REMOVING IMPROBABLE TENSOR VALUES (DIAGONAL ELEMENTS < 0 OR > 3xADC_WATER) FOR VISUALIZATION')
+    print('LOCATING IMPROBABLE TENSOR VALUES (DIAGONAL ELEMENTS < 0 OR > 3xADC_WATER)')
 
     tensor_img, tensor_aff, _ = utils.load_nii(tensor_file, ndim=4)
 
@@ -977,15 +1003,26 @@ def _filter_tensor(tensor_file, filter_dir):
     for i in range(1, bad_adcdiag_img.shape[3]):
         bad_adc3d_img = np.logical_or(bad_adc3d_img, bad_adcdiag_img[:, :, :, i])
     bad_adc3d_nii = nib.Nifti1Image(bad_adc3d_img.astype('int'), tensor_aff)
+
+    return bad_adc3d_nii
+
+def _filter_bad_adc(glyph_file, bad_adc3d_nii, filter_dir):
+
+    glyph_prefix = utils.get_prefix(glyph_file)
+
+    print('REMOVING IMPROBABLE EIGENVALUE GLYPHS FROM {}'.format(glyph_prefix))
+
+    glyph_img, glyph_aff, _ = utils.load_nii(glyph_file, ndim=4)
+
     bad_adc3d_nii_list = []
-    for i in range(0, tensor_img.shape[3]):
+    for i in range(0, glyph_img.shape[3]):
         bad_adc3d_nii_list.append(bad_adc3d_nii)
     bad_adc4d_nii = nib.concat_images(bad_adc3d_nii_list, axis=None)
     bad_adc4d_img = bad_adc4d_nii.get_data().astype('bool')
 
-    tensor_filtered_img = tensor_img
-    tensor_filtered_img[bad_adc4d_img] = np.nan
-    tensor_filtered_file = os.path.join(filter_dir, '{}_filtered.nii.gz'.format(tensor_prefix))
-    utils.save_nii(tensor_filtered_img, tensor_aff, tensor_filtered_file)
+    glyph_filtered_img = glyph_img
+    glyph_filtered_img[bad_adc4d_img] = np.nan
+    glyph_filtered_file = os.path.join(filter_dir, '{}_filtered.nii.gz'.format(glyph_prefix))
+    utils.save_nii(glyph_filtered_img, glyph_aff, glyph_filtered_file)
 
-    return tensor_filtered_file
+    return glyph_filtered_file

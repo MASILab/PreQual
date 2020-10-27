@@ -30,6 +30,7 @@ def main():
     parser.add_argument('pe_axis', help='Phase encoding axis (direction agnostic) (i.e. i or j)')
     parser.add_argument('--bval_threshold', metavar='N', default='50', help='Non-negative integer threshold under which to consider a b-value to be 0 (default = 50)')
     parser.add_argument('--nonzero_shells', metavar='s1,s2,...,sn/auto', default='auto', help='Comma separated list of positive integers indicating nonzero shells for SNR/CNR analysis when there are more unique b-values than shells determined by eddy or automatically determine shells by rounding to nearest 100 (default = auto)')
+    parser.add_argument('--degibbs', metavar='on/off', default='off', help='Remove Gibbs ringing artifacts from MRI images (default = off)')
     parser.add_argument('--denoise', metavar='on/off', default='on', help='Denoise images prior to preprocessing (default = on)')
     parser.add_argument('--prenormalize', metavar='on/off', default='on', help='Normalize intensity distributions before preprocessing (default = on)')
     parser.add_argument('--synb0', metavar='on/off', default='on', help='Run topup with a synthetic b0 generated with Synb0-DisCo if no reverse phase encoded images are supplied and a T1 is supplied (default = on)')
@@ -40,6 +41,7 @@ def main():
     parser.add_argument('--extra_eddy_args', metavar='string', default='', help='Extra arguments to pass to eddy')
     parser.add_argument('--postnormalize', metavar='on/off', default='off', help='Normalize intensity distributions after preprocessing (default = off)')
     parser.add_argument('--correct_bias', metavar='on/off', default='off', help='Perform N4 bias field correction as implemented in ANTS (default = off)')
+    parser.add_argument('--glyph_type', metavar='tensor/vector', default='tensor', help='In the QA document, visualize the tensor model either as glyphs of the full tensors or as glyphs of the principal eigenvector (default = tensor)')
     parser.add_argument('--split_outputs', action='store_true', help='Split preprocessed output to match structure of input files (default = do NOT split)')
     parser.add_argument('--keep_intermediates', action='store_true', help='Keep intermediate copies of data (default = do NOT keep)')
     parser.add_argument('--num_threads', metavar='N', default=1, help='Non-negative integer indicating number of threads to use when running multi-threaded steps of this pipeline (default = 1)')
@@ -95,6 +97,13 @@ def main():
             params['shells'] = np.sort(np.unique(shells))
         except:
             raise utils.DTIQAError('INVALID INPUT FOR --nonzero_shells PARAMETER. EXITING.')
+
+    if args.degibbs == 'on':
+        params['use_degibbs'] = True
+    elif args.degibbs == 'off':
+        params['use_degibbs'] = False
+    else:
+        raise utils.DTIQAError('INVALID INPUT FOR --degibbs PARAMETER. EXITING.')
 
     if args.denoise == 'on':
         params['use_denoise'] = True
@@ -164,6 +173,11 @@ def main():
     else:
         raise utils.DTIQAError('INVALID INPUT FOR --correct_bias PARAMETER. EXITING.')
 
+    if args.glyph_type == 'tensor' or args.glyph_type == 'vector':
+        params['glyph_type'] = args.glyph_type
+    else:
+        raise utils.DTIQAError('INVALID INPUT FOR --glyph_type PARAMETER. EXITING.')
+
     params['split_outputs'] = args.split_outputs
     params['keep_intermediates'] = args.keep_intermediates
 
@@ -214,6 +228,7 @@ def main():
     print('PARAMETERS:')
     print('- BValue Threshold: {}'.format(params['bval_threshold']))
     print('- Shells: {}'.format(params['shells']))
+    print('- Degibbs: {}'.format(params['use_degibbs']))
     print('- Denoise: {}'.format(params['use_denoise']))
     print('- Prenormalize: {}'.format(params['use_prenormalize']))
     print('- Extra Topup Args: {}'.format(params['extra_topup_args']))
@@ -223,6 +238,7 @@ def main():
     print('- Extra Eddy Args: {}'.format(params['extra_eddy_args']))
     print('- Postnormalize: {}'.format(params['use_postnormalize']))
     print('- N4 Bias Correction: {}'.format(params['use_unbias']))
+    print('- Glyph Visulization: {}'.format(params['glyph_type']))
     print('- Split Outputs: {}'.format(params['split_outputs']))
     print('- Keep Intermediates: {}'.format(params['keep_intermediates']))
     print('- Number of Threads: {}'.format(SHARED_VARS.NUM_THREADS))
@@ -285,6 +301,37 @@ def main():
     print('*** DTIQA V7: BVAL/BVEC COMBOS CHECKED ({:05d}s) ***'.format(dt))
     print('***************************************************\n')
 
+    # DEGIBBS
+
+    print('**********************************')
+    print('*** DTIQA V7: STARTING DEGIBBS ***')
+    print('**********************************')
+
+    ti = time.time()
+
+    degibbs_dir = utils.make_dir(out_dir, 'DEGIBBS')
+
+    if params['use_degibbs']:
+
+        dwi_degibbs_files = []
+        for dwi_checked_file in dwi_checked_files:
+            dwi_degibbs_file, degibbs_warning_str = utils.dwi_degibbs(dwi_checked_file, degibbs_dir)
+            dwi_degibbs_files.append(dwi_degibbs_file)
+            if not degibbs_warning_str == '':
+                warning_strs.append(degibbs_warning_str)
+
+    else:
+
+        print('SKIPPING DEGIBBS')
+        dwi_degibbs_files = dwi_checked_files
+
+    tf = time.time()
+    dt = round(tf - ti)
+
+    print('********************************************')
+    print('*** DTIQA V7: FINISHED DEGIBBS ({:05d}s) ***'.format(dt))
+    print('********************************************\n')
+
     # DENOISE
 
     print('************************************')
@@ -298,8 +345,8 @@ def main():
     if params['use_denoise']:
 
         dwi_denoised_files = []
-        for dwi_checked_file in dwi_checked_files:
-            dwi_denoised_file, denoise_warning_str = utils.dwi_denoise(dwi_checked_file, denoised_dir)
+        for dwi_degibbs_file in dwi_degibbs_files:
+            dwi_denoised_file, denoise_warning_str = utils.dwi_denoise(dwi_degibbs_file, denoised_dir)
             dwi_denoised_files.append(dwi_denoised_file)
             if not denoise_warning_str == '':
                 warning_strs.append(denoise_warning_str)
@@ -307,7 +354,7 @@ def main():
     else:
 
         print('SKIPPING DENOISING')
-        dwi_denoised_files = dwi_checked_files
+        dwi_denoised_files = dwi_degibbs_files
 
     tf = time.time()
     dt = round(tf - ti)
@@ -571,7 +618,7 @@ def main():
 
     scalars_dir = utils.make_dir(out_dir, 'SCALARS')
 
-    fa_file, md_file, ad_file, rd_file = preproc.scalars(tensor_file, mask_file, scalars_dir)
+    fa_file, md_file, ad_file, rd_file, v1_file = preproc.scalars(tensor_file, mask_file, scalars_dir)
 
     tf = time.time()
     dt = round(tf - ti)
@@ -643,7 +690,7 @@ def main():
     if params['use_unbias']:
         bias_vis_file = vis.vis_bias(dwi_norm_file, bvals_norm_file, dwi_unbiased_file, bias_field_file, vis_dir)
     dwi_vis_files = vis.vis_dwi(dwi_preproc_file, bvals_preproc_shelled, bvecs_preproc_file, cnr_dict, vis_dir)
-    tensor_vis_file = vis.vis_tensor(tensor_file, fa_file, cc_center_voxel, vis_dir)
+    glyph_vis_file = vis.vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_type=params['glyph_type'])
     fa_vis_file = vis.vis_scalar(fa_file, vis_dir, name='FA')
     fa_stats_vis_file = vis.vis_fa_stats(roi_names, roi_med_fa, fa_file, atlas_ants_fa_file, vis_dir)
     md_vis_file = vis.vis_scalar(md_file, vis_dir, name='MD')
@@ -665,7 +712,7 @@ def main():
     vis_files.append(gradcheck_vis_file)
     for dwi_vis_file in dwi_vis_files:
         vis_files.append(dwi_vis_file)
-    vis_files.append(tensor_vis_file)
+    vis_files.append(glyph_vis_file)
     vis_files.append(fa_vis_file)
     vis_files.append(fa_stats_vis_file)
     vis_files.append(md_vis_file)
