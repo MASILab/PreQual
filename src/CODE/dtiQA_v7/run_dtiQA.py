@@ -42,6 +42,7 @@ def main():
     parser.add_argument('--postnormalize', metavar='on/off', default='off', help='Normalize intensity distributions after preprocessing (default = off)')
     parser.add_argument('--correct_bias', metavar='on/off', default='off', help='Perform N4 bias field correction as implemented in ANTS (default = off)')
     parser.add_argument('--glyph_type', metavar='tensor/vector', default='tensor', help='In the QA document, visualize the tensor model either as glyphs of the full tensors or as glyphs of the principal eigenvector (default = tensor)')
+    parser.add_argument('--atlas_reg_type', metavar='FA/b0', default='FA', help='Register to the JHU atlas by using the subject FA map or the subject average preprocessed b0 (default = FA)')
     parser.add_argument('--split_outputs', action='store_true', help='Split preprocessed output to match structure of input files (default = do NOT split)')
     parser.add_argument('--keep_intermediates', action='store_true', help='Keep intermediate copies of data (default = do NOT keep)')
     parser.add_argument('--num_threads', metavar='N', default=1, help='Non-negative integer indicating number of threads to use when running multi-threaded steps of this pipeline (default = 1)')
@@ -178,6 +179,11 @@ def main():
     else:
         raise utils.DTIQAError('INVALID INPUT FOR --glyph_type PARAMETER. EXITING.')
 
+    if args.atlas_reg_type == 'FA' or args.atlas_reg_type == 'b0':
+        params['atlas_reg_type'] = args.atlas_reg_type
+    else:
+        raise utils.DTIQAError('INVALID INPUTS FOR --atlas_reg_type PARAMETER. EXITING.')
+
     params['split_outputs'] = args.split_outputs
     params['keep_intermediates'] = args.keep_intermediates
 
@@ -239,6 +245,7 @@ def main():
     print('- Postnormalize: {}'.format(params['use_postnormalize']))
     print('- N4 Bias Correction: {}'.format(params['use_unbias']))
     print('- Glyph Visulization: {}'.format(params['glyph_type']))
+    print('- Atlas Registration: {}'.format(params['atlas_reg_type']))
     print('- Split Outputs: {}'.format(params['split_outputs']))
     print('- Keep Intermediates: {}'.format(params['keep_intermediates']))
     print('- Number of Threads: {}'.format(SHARED_VARS.NUM_THREADS))
@@ -645,7 +652,7 @@ def main():
     if not cnr_warning_str == '':
         warning_strs.append(cnr_warning_str)
     
-    roi_names, roi_med_fa, atlas_ants_fa_file, cc_center_voxel, fa_stats_out_list = stats.scalar_info(fa_file, md_file, ad_file, rd_file, stats_dir)
+    roi_names, roi_med_fa, atlas2subj_file, cc_center_voxel, fa_stats_out_list = stats.scalar_info(dwi_preproc_file, bvals_preproc_file, fa_file, md_file, ad_file, rd_file, stats_dir, reg_type=params['atlas_reg_type'])
 
     stats.stats_out(motion_stats_out_list, cnr_stats_out_list, fa_stats_out_list, stats_dir)
 
@@ -692,7 +699,7 @@ def main():
     dwi_vis_files = vis.vis_dwi(dwi_preproc_file, bvals_preproc_shelled, bvecs_preproc_file, cnr_dict, vis_dir)
     glyph_vis_file = vis.vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_type=params['glyph_type'])
     fa_vis_file = vis.vis_scalar(fa_file, vis_dir, name='FA')
-    fa_stats_vis_file = vis.vis_fa_stats(roi_names, roi_med_fa, fa_file, atlas_ants_fa_file, vis_dir)
+    fa_stats_vis_file = vis.vis_fa_stats(roi_names, roi_med_fa, fa_file, atlas2subj_file, vis_dir)
     md_vis_file = vis.vis_scalar(md_file, vis_dir, name='MD')
 
     # Combine component PDFs

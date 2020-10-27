@@ -54,6 +54,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
         '- Run Postnormalize: {}\n'
         '- Run N4 Bias Field Correction: {}\n'
         '- Glyph Visualization Type: {}\n'
+        '- Atlas Registration Type: {}\n'
         '- Split Outputs: {}\n'
         '- Keep Intermediates: {}\n'
         .format(params['bval_threshold'],
@@ -69,6 +70,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
                 params['use_postnormalize'],
                 params['use_unbias'],
                 params['glyph_type'],
+                params['atlas_reg_type'],
                 params['split_outputs'],
                 params['keep_intermediates']))
 

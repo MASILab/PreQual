@@ -21,6 +21,7 @@ class SharedVars():
         # Define FA atlas variables
 
         self.STANDARD_FA_FILE = os.path.join(supplemental_dir, 'JHU-ICBM-FA-1mm.nii.gz')
+        self.STANDARD_T2_FILE = os.path.join(supplemental_dir, 'JHU-ICBM-T2-1mm.nii.gz')
         self.ATLAS_FILE = os.path.join(supplemental_dir, 'JHU-ICBM-labels-1mm.nii.gz')
         self.ROI_NAMES_FILE = os.path.join(supplemental_dir, 'JHU_label.txt')
 
@@ -51,7 +52,7 @@ class SharedVars():
         # Define versioning and creation date
 
         self.VERSION = '1.0.2-dev'
-        self.CREATION_DATE = 'October 26, 2020'
+        self.CREATION_DATE = 'October 27, 2020'
 
 # Define instance of SharedVars class that will be accessible to (and editable by) other modules
 

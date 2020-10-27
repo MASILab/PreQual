@@ -230,27 +230,39 @@ def cnr(dwi_file, bvals_file, mask_file, eddy_dir, stats_dir, shells=[]):
 
     return cnr_dict, bvals, stats_out_list, cnr_warning_str
 
-def scalar_info(fa_file, md_file, ad_file, rd_file, stats_dir):
+def scalar_info(dwi_file, bvals_file, fa_file, md_file, ad_file, rd_file, stats_dir, reg_type='FA'):
 
     print('EXTRACTING AVERAGE FA PER ROI AND LOCATION OF CORPUS CALLOSUM')
 
     temp_dir = utils.make_dir(stats_dir, 'TEMP')
 
-    print('REGISTERING ATLAS TO FA PATIENT SPACE')
+    if reg_type == 'FA':
+        subj2template_prefix = os.path.join(temp_dir, 'fa2template_')
+        subj_file = fa_file
+        template_file = SHARED_VARS.STANDARD_FA_FILE
+    elif reg_type == 'b0':
+        subj2template_prefix = os.path.join(temp_dir, 'b02template_')
+        b0s_file, _, _ = utils.dwi_extract(dwi_file, bvals_file, temp_dir, target_bval=0, first_only=False)
+        subj_file = utils.dwi_avg(b0s_file, temp_dir)
+        template_file = SHARED_VARS.STANDARD_T2_FILE
+    
+    print('REGISTERING ATLAS TO PATIENT SPACE') # https://github.com/ANTsX/ANTs/wiki/Forward-and-inverse-warps-for-warping-images,-pointsets-and-Jacobians
 
-    standard_ants_fa_prefix = os.path.join(temp_dir, 'standard_ants_fa_')
-
-    reg_cmd = 'antsRegistrationSyNQuick.sh -d 3 -f {} -m {} -n {} -o {}'.format(fa_file, SHARED_VARS.STANDARD_FA_FILE, SHARED_VARS.NUM_THREADS, standard_ants_fa_prefix)
+    reg_cmd = 'antsRegistrationSyNQuick.sh -d 3 -f {} -m {} -n {} -o {}'.format(template_file, subj_file, SHARED_VARS.NUM_THREADS, subj2template_prefix)
     utils.run_cmd(reg_cmd)
 
-    atlas_ants_fa_file = os.path.join(stats_dir, 'atlas_ants_fa.nii.gz')
+    atlas2subj_file = os.path.join(stats_dir, 'atlas2subj.nii.gz')
 
-    applyreg_cmd = 'antsApplyTransforms -d 3 -i {} -r {} -n NearestNeighbor -t {} -t {} -o {}'.format(SHARED_VARS.ATLAS_FILE, 
-                                                                                                      fa_file, 
-                                                                                                      '{}1Warp.nii.gz'.format(standard_ants_fa_prefix), 
-                                                                                                      '{}0GenericAffine.mat'.format(standard_ants_fa_prefix), 
-                                                                                                      atlas_ants_fa_file)
+    applyreg_cmd = 'antsApplyTransforms -d 3 -i {} -r {} -n NearestNeighbor -t [{},1] -t {} -o {}'.format(SHARED_VARS.ATLAS_FILE, 
+                                                                                                      subj_file, 
+                                                                                                      '{}0GenericAffine.mat'.format(subj2template_prefix), 
+                                                                                                      '{}1InverseWarp.nii.gz'.format(subj2template_prefix), 
+                                                                                                      atlas2subj_file)
     utils.run_cmd(applyreg_cmd)
+
+    utils.move_file('{}0GenericAffine.mat'.format(subj2template_prefix), stats_dir)
+    utils.move_file('{}1Warp.nii.gz'.format(subj2template_prefix), stats_dir)
+    utils.move_file('{}1InverseWarp.nii.gz'.format(subj2template_prefix), stats_dir)
 
     print('PREPARING SCALAR VOLUMES AND ROIS FROM REGISTERED ATLAS')
 
@@ -258,7 +270,7 @@ def scalar_info(fa_file, md_file, ad_file, rd_file, stats_dir):
     md_img, _, _ = utils.load_nii(md_file, ndim=3)
     ad_img, _, _ = utils.load_nii(ad_file, ndim=3)
     rd_img, _, _ = utils.load_nii(rd_file, ndim=3)
-    atlas_ants_fa_img, _, _ = utils.load_nii(atlas_ants_fa_file, ndim=3)
+    atlas2subj_img, _, _ = utils.load_nii(atlas2subj_file, ndim=3)
 
     roi_names = []
     with open(SHARED_VARS.ROI_NAMES_FILE, 'r') as f:
@@ -274,7 +286,7 @@ def scalar_info(fa_file, md_file, ad_file, rd_file, stats_dir):
     roi_med_rd = []
     for i in range(0, len(roi_names)):
         roi_val = i + 1
-        index = atlas_ants_fa_img == roi_val
+        index = atlas2subj_img == roi_val
         roi_med_fa.append(np.nanmedian(fa_img[index]))
         roi_med_md.append(np.nanmedian(md_img[index]))
         roi_med_ad.append(np.nanmedian(ad_img[index]))
@@ -321,11 +333,11 @@ def scalar_info(fa_file, md_file, ad_file, rd_file, stats_dir):
 
     cc_genu_val = 3 # taken from label.txt
     cc_splenium_val = 5
-    cc_index = np.logical_or(atlas_ants_fa_img == cc_genu_val, atlas_ants_fa_img == cc_splenium_val)
+    cc_index = np.logical_or(atlas2subj_img == cc_genu_val, atlas2subj_img == cc_splenium_val)
     cc_locs = np.column_stack(np.where(cc_index))
     cc_center_voxel = (np.nanmean(cc_locs[:, 0]), np.nanmean(cc_locs[:, 1]), np.nanmean(cc_locs[:, 2]))
 
-    return roi_names, roi_med_fa, atlas_ants_fa_file, cc_center_voxel, stats_out_list
+    return roi_names, roi_med_fa, atlas2subj_file, cc_center_voxel, stats_out_list
 
 def stats_out(motion_stats_out_list, cnr_stats_out_list, fa_stats_out_list, stats_dir):
     
