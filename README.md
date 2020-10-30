@@ -4,6 +4,31 @@
 
 ![Pipeline Overview](https://github.com/MASILab/PreQual/blob/master/pipeline_overview.png?raw=true)
 
+* **Summary:** Perform integrated preprocessing and quality assurance of diffusion MRI data
+
+* **Preprocessing Steps:** 
+    1. Gibbs de-ringing (optional, not recommended)
+    1. MP-PCA denoising (optional)
+    1. Inter-scan normalization (optional)
+    1. Susceptibility-induced distortion correction (with or without reverse gradient images or field maps)
+    1. Eddy current-induced distortion correction
+    1. Inter-volume motion correction
+    1. Slice-wise signal dropout imputation
+    1. N4 bias field correction (optional)
+
+* **Quality Assurance Steps:** 
+    1. Verification of phase encoding schemes
+    1. Analysis of gradient directions
+    1. Shell-wise analysis of signal-to-noise and contrast-to-noise ratios
+    1. Correction of corrupted inter-scan intensity relationships
+    1. Shell-wise analysis of distortion corrections
+    1. Analysis of inter-volume motion and slice-wise signal dropout
+    1. Analysis of bias fields
+    1. Verification of intra-pipeline masking
+    1. Analysis of tensor goodness-of-fit
+    1. Voxel-wise and region-wise quantification of FA
+    1. Voxel-wise quantification of MD
+
 ## Authors and Reference
 
 [Leon Y. Cai](mailto:leon.y.cai@vanderbilt.edu), Qi Yang, Colin B. Hansen, Vishwesh Nath, Karthik Ramadass, Graham W. Johnson, Benjamin N. Conrad, Brian D. Boyd, John P. Begnoche, Lori L. Beason-Held, Andrea T. Shafer, Susan M. Resnick, Warren D. Taylor, Gavin R. Price, Victoria L. Morgan, Baxter P. Rogers, Kurt G. Schilling, Bennett A. Landman. *PreQual: An automated pipeline for integrated preprocessing and quality assurance of diffusion weighted MRI images*. [bioRxiv](https://www.biorxiv.org/content/10.1101/2020.09.14.260240v2), 2020. Preprint.
@@ -14,7 +39,7 @@
 
     git clone https://github.com/MASILab/PreQual.git
     cd /path/to/repo/PreQual
-    git checkout v1.0.1
+    git checkout v1.0.2
     sudo singularity build /path/to/prequal.simg Singularity
 
 We use Singularity version 3.4 with root permissions.
@@ -65,7 +90,7 @@ We use Singularity version 3.4 with root permissions.
 
 * **pe\_axis:** Phase encoding axis of all the input images. We do NOT support different phase encoding axes between different input images at this time. The options are i and j and correspond to the first and second dimension of the input images, respectively. Note that FSL does not currently support phase encoding in the third dimension (i.e. k, the dimension in which the image slices were acquired, commonly axial for RAS and LAS oriented images). This parameter is direction AGNOSTIC. The phase encoding directions of the input images along this axis are specified in the dtiQA\_config.csv file. See "dtiQA\_config.csv Format" and “Example Phase Encoding Schemes” for more information.
 
-## **Formatting dtiQA\_config.csv**
+## Formatting dtiQA\_config.csv
 
 The format for the lines of the configuration CSV file are as follows:
 
@@ -90,6 +115,16 @@ pe\_axis | pe\_dir | readout\_time | acqparams line
 i | + |	0.05 | 1, 0, 0, 0.05
 j | - | 0.1 | 0, -1, 0, 0.1
 
+## Quick Start
+
+These are examples of common use cases. They also all share the same command, as detailed above. The PREPROCESSED output folder will contain the final outputs and the PDF folder will contain the QA report.
+
+Phase Encoding<br>Axis | Reverse Phase<br>Encoded (RPE) Image | T1<br>Image | Contents of<br>Input Directory | Contents of<br>dtiQA_config.csv
+------------------- | ----------------------------------|----------|-----------------------------|-----------------------------
+j | Yes | N/A |	dti1.nii.gz<br>dti1.bval<br>dti1.bvec<br>dti2.nii.gz<br>dti2.bval<br>dti2.bvec<br>rpe.nii.gz<br>rpe.bval<br>rpe.bvec  | dti1,+,0.05<br>dti2,+,0.05<br>rpe,-,0.05
+j | No | Yes |	dti1.nii.gz<br>dti1.bval<br>dti1.bvec<br>dti2.nii.gz<br>dti2.bval<br>dti2.bvec<br>t1.nii.gz  | dti1,+,0.05<br>dti2,+,0.05
+j | No | No | dti1.nii.gz<br>dti1.bval<br>dti1.bvec<br>dti2.nii.gz<br>dti2.bval<br>dti2.bvec | dti1,+,0.05<br>dti2,+,0.05
+
 ## Options
 
 **--bval\_threshold N**
@@ -103,6 +138,12 @@ Default = 50
 A comma separated list of positive integers (s/mm<sup>2</sup>) indicating nonzero shells for SNR/CNR analysis when there are more unique b-values than shells determined by eddy or automatically determine shells by rounding to nearest 100. Useful when b-values are modulated around a shell value instead of set exactly at that value. Only used when determining shells for SNR/CNR analysis. Original b-values used elsewhere in pipeline.
 
 Default = auto
+
+**--degibbs on/off**
+
+Remove Gibbs ringing artifacts using the local subvoxel-shifts method as [implemented in MRTrix3](https://mrtrix.readthedocs.io/en/latest/reference/commands/mrdegibbs.html). When performed it is performed prior to all other preprocessing including denoising. We strongly caution against using this feature as it not designed for the partial Fourier schemes with which most echo planar diffusion images are acquired.
+
+Default = off
 
 **--denoise on/off**
 
@@ -201,6 +242,18 @@ Perform [ANTs N4 bias field correction](https://manpages.debian.org/testing/ants
 
 Default = off
 
+**--glyph\_type tensor/vector**
+
+Visualize either tensors or principal eigenvectors in the QA document.
+
+Default = tensor
+
+**--atlas\_reg\_type FA/b0**
+
+Perform JHU white matter atlas registration to the subject by either deformably registering the subject's FA map or average b0 to the MNI FA or T2 template, respectively. Empirically, the FA approach tends to be more accurate for white matter whereas the b0 approach tends to be more accurate globally. The b0 approach is more robust for acquisitions with low shells (i.e., b < 500 s/mm<sup>2</sup>) or poor masking that result in the inclusion of a lot of facial structure.
+
+Default = FA
+
 **--split\_outputs**
 
 Split the fully preprocessed output (a concatenation of the input images) back into their component parts and do NOT keep the concatenated preprocessed output.
@@ -245,11 +298,11 @@ Default = sess
 
 ## Pipeline Assumptions
 
-* All NIFTI images are consistent with a conversion from a DICOM using `dcm2niix` ([at least v1.0.20180622](https://github.com/rordenlab/dcm2niix/releases/tag/v1.0.20180622)) by Chris Rorden and are raw NIFTIs without distortion correction. We require this as dcm2niix exports b-value/b-vector files in FSL format and removes ADC or trace images auto-generated in some Philips DICOMs. In addition `dcm2niix` correctly moves the gradients from scanner to subject space, whereas some Philips PARREC converters do not, which may result in spurious results or pipeline failure. 
+* All NIFTI images are consistent with a conversion from a DICOM using `dcm2niix` ([at least v1.0.20180622](https://github.com/rordenlab/dcm2niix/releases/tag/v1.0.20180622)) by Chris Rorden and are raw NIFTIs without distortion correction. We require this as dcm2niix exports b-value/b-vector files in FSL format and removes ADC or trace images auto-generated in some Philips DICOMs. In addition `dcm2niix` correctly moves the gradients from scanner to subject space and does not re-order volumes, both of which can cause spurious results or pipeline failure. 
 
   * **We expect raw volumes only, no ADC or trace volumes.** ADC volumes are sometimes encoded as having a b-value greater than 0 with a corresponding b-vector of (0,0,0) and trace volumes are sometimes encoded as having a b-value of 0 with a corresponding non-unit normalized b-vector, as in the case of some Philips PARREC converters. We check for these cases, remove the affected volumes, and report a warning in the console and in the PDF. 
 
-  * We cannot, unfortunately, account for failure of reorientation of gradients into subject space.
+  * We cannot, unfortunately, account for failure of reorientation of gradients into subject space. Visualization of tensor glyphs or principal eigenvectors can be helpful in distinguishing this. However, this error can be subtle so we suggest proper DICOM to NIFTI conversion with the above release of `dcm2niix`.
 
 * Images will be processed in the order they are listed in dtiQA\_config.csv.
 
@@ -282,6 +335,8 @@ Default = sess
 1. Threshold all b-values such that values less than the `--bval_threshold` parameter are 0.
 
 1. Check that all b-vectors are unit normalized and all b-values greater than zero have associated non-zero b-vectors. For any volumes where this is not the case, we remove them, flag a warning for the output PDF, and continue the pipeline.
+
+1. If applicable, perform Gibbs de-ringing on all diffusion scans with `mrdegibbs` from MRTrix3.
 
 1. If applicable, denoise all diffusion scans with `dwidenoise` (Marchenko-Pastur PCA) from MrTrix3.
 
@@ -377,7 +432,7 @@ Default = sess
 
    1. We then visualize some central slices of the average volumes for all unique b-values, including b = 0 and report the median intra-mask SNR or CNR calculated by eddy as appropriate. If there are more unique b-values than shells deteremined by eddy, we round the b-values to the nearest 100 by default to assign volumes to shells or we choose the nearest shell indicated by the user (see `--nonzero_shells`).
 
-   1. We visualize the tensors using MRTrix3’s mrview, omitting the tensors with negative eigenvalues or eigenvalues greater than 3 times the ADC of water at 37°C.
+   1. We visualize the tensors (or principal eigenvectors depending on `--glyph_type`) using MRTrix3’s mrview, omitting the tensors with negative eigenvalues or eigenvalues greater than 3 times the ADC of water at 37°C.
 
    1. We then visualize some central slices of the FA map clipped from 0 to 1 as well as the average FA for the Hopkins ROIs and the quality of the atlas registration.
 
@@ -415,13 +470,21 @@ Folders and files in *italics* are removed if `--keep_intermediates` is NOT indi
 
     * *\<imageN\>\_checked.bvec*
 
-1. *DENOISED* (these files are only created if `--denoise` is on)
+1. *DEGIBBS* (these files are only created if `--degibbs` is on)
 
-    * *\<image1\>\_checked\_denoised.nii.gz*
+    * *\<image1\_%\>\_degibbs.nii.gz*
 
         :
 
-    * *\<imageN\>\_checked\_denoised.nii.gz*
+    * *\<imageN\_%\>\_degibbs.nii.gz*
+
+1. *DENOISED* (these files are only created if `--denoise` is on)
+
+    * *\<image1\_%\>\_denoised.nii.gz*
+
+        :
+
+    * *\<imageN\_%\>\_denoised.nii.gz*
 
 1. *PRENORMALIZED* (these files are only created if `--prenormalize` is on)
 
@@ -565,7 +628,13 @@ Folders and files in *italics* are removed if `--keep_intermediates` is NOT indi
 
 1. **STATS**
 
-    * **atlas\_ants\_fa.nii.gz**
+    * **atlas2subj.nii.gz**
+
+    * **b02template\_0GenericAffine.mat** or **fa2template\_0GenericAffine.mat** depending on `--atlas_reg_type`
+
+    * **b02template\_1Warp.nii.gz** or **fa2template\_1Warp.nii.gz** depending on `--atlas_reg_type`
+
+    * **b02template\_1InverseWarp.nii.gz** or **fa2template\_1InverseWarp.nii.gz** depending on `--atlas_reg_type`
 
     * **chisq\_mask.nii.gz**
 
@@ -585,7 +654,7 @@ Folders and files in *italics* are removed if `--keep_intermediates` is NOT indi
 
     * **stats.csv** (contains summary of all motion, SNR/CNR, and average FA stats)
 
-1. **OPTIMIZED\_BVECS** (these are sign/axis permuted per `dwigradcheck` and are used for QA purposes)
+1. **OPTIMIZED\_BVECS** (these are sign/axis permuted per `dwigradcheck` and are only used for QA purposes)
 
     * **dwmri.bval**
 
