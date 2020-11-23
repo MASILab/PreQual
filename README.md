@@ -7,7 +7,7 @@
 * [Containerization of Source Code](#containerization-of-source-code)
 * [Command](#command)
 * [Arguments and I/O](#arguments-and-io)
-* [Formatting dtiQA\_config.csv](#formatting-dtiqa-config-csv)
+* [Configuration File](#configuration-file)
 * [Example Phase Encoding Schemes](#example-phase-encoding-schemes)
 * [Quick Start](#quick-start)
 * [Options](#options)
@@ -81,9 +81,9 @@ We use Singularity version 3.4 with root permissions.
 
 ## Arguments and I/O
 
-* **Input Directory:** The dtiQA\_config.csv file and at least one diffusion weighted image must be provided.
+* **Input Directory:** The dtiQA\_config.csv configuration file and at least one diffusion weighted image must be provided.
 
-  * dtiQA\_config.csv (see below for format, must be named exactly)
+  * dtiQA\_config.csv (see [below](#configuration-file) for format, must be named exactly)
 
   * \<image1\>.nii.gz (diffusion weighted image)
 
@@ -107,9 +107,9 @@ We use Singularity version 3.4 with root permissions.
 
 * **pe\_axis:** Phase encoding axis of all the input images. We do NOT support different phase encoding axes between different input images at this time. The options are i and j and correspond to the first and second dimension of the input images, respectively. Note that FSL does not currently support phase encoding in the third dimension (i.e. k, the dimension in which the image slices were acquired, commonly axial for RAS and LAS oriented images). This parameter is direction AGNOSTIC. The phase encoding directions of the input images along this axis are specified in the dtiQA\_config.csv file. See "dtiQA\_config.csv Format" and “Example Phase Encoding Schemes” for more information.
 
-## Formatting dtiQA\_config.csv
+## Configuration File
 
-The format for the lines of the configuration CSV file are as follows:
+The format for the lines of the configuration CSV file, dtiQA\_config.csv (must be named exactly), are as follows:
 
     <image1>,pe_dir,readout_time
     :
@@ -117,7 +117,7 @@ The format for the lines of the configuration CSV file are as follows:
 
 * **\<image\>** is the shared file PREFIX between the corresponding NIFTI, BVAL, and BVEC files for that particular image (i.e. HARDI\_iso.nii.gz -\> HARDI\_iso)
 
-* **pe\_dir** is either + or -, corresponding to the direction along the phase encoding axis (as defined by the parameter pe\_axis) on which the image is phase encoded.
+* **pe\_dir** is either + or -, corresponding to the direction along the phase encoding axis (as defined by the parameter `pe_axis`) on which the image is phase encoded.
 
   * Note that a combination of phase encoding axis and direction map to specific anatomical (i.e. APA, APP, etc.) directions based on the orientation of the image. So, for instance in a RAS image, an axis of j and direction of + map to APP. We infer the orientation of the image from the header of the NIFTI using nibabel tools and output the best anatomical phase encoding direction interpretation of the input direction in the PDF.
 
@@ -138,9 +138,9 @@ These are examples of common use cases. They also all share the same command, as
 
 Phase Encoding<br>Axis | Reverse Phase<br>Encoded (RPE) Image | T1<br>Image | Contents of<br>Input Directory | Contents of<br>dtiQA_config.csv
 ------------------- | ----------------------------------|----------|-----------------------------|-----------------------------
-j | Yes | N/A |	dti1.nii.gz<br>dti1.bval<br>dti1.bvec<br>dti2.nii.gz<br>dti2.bval<br>dti2.bvec<br>rpe.nii.gz<br>rpe.bval<br>rpe.bvec  | dti1,+,0.05<br>dti2,+,0.05<br>rpe,-,0.05
-j | No | Yes |	dti1.nii.gz<br>dti1.bval<br>dti1.bvec<br>dti2.nii.gz<br>dti2.bval<br>dti2.bvec<br>t1.nii.gz  | dti1,+,0.05<br>dti2,+,0.05
-j | No | No | dti1.nii.gz<br>dti1.bval<br>dti1.bvec<br>dti2.nii.gz<br>dti2.bval<br>dti2.bvec | dti1,+,0.05<br>dti2,+,0.05
+j | Yes | N/A |	dti1.nii.gz<br>dti1.bval<br>dti1.bvec<br>dti2.nii.gz<br>dti2.bval<br>dti2.bvec<br>rpe.nii.gz<br>rpe.bval<br>rpe.bvec<br>dtiQA_config.csv  | dti1,+,0.05<br>dti2,+,0.05<br>rpe,-,0.05
+j | No | Yes |	dti1.nii.gz<br>dti1.bval<br>dti1.bvec<br>dti2.nii.gz<br>dti2.bval<br>dti2.bvec<br>t1.nii.gz<br>dtiQA_config.csv  | dti1,+,0.05<br>dti2,+,0.05
+j | No | No | dti1.nii.gz<br>dti1.bval<br>dti1.bvec<br>dti2.nii.gz<br>dti2.bval<br>dti2.bvec<br>dtiQA_config.csv | dti1,+,0.05<br>dti2,+,0.05
 
 ## Options
 
