@@ -7,7 +7,7 @@
 * [Containerization of Source Code](#containerization-of-source-code)
 * [Command](#command)
 * [Arguments and I/O](#arguments-and-io)
-* [Formatting dtiQA\_config.csv](#formatting-dtiqa_config.csv)
+* [Formatting dtiQA\_config.csv](#formatting-dtiqa\_config.csv)
 * [Example Phase Encoding Schemes](#example-phase-encoding-schemes)
 * [Quick Start](#quick-start)
 * [Options](#options)
