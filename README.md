@@ -1,5 +1,22 @@
 # PreQual (dtiQA v7 Multi) User Guide
 
+## Contents
+
+* [Overview](#overview)
+* [Authors and Reference](#authors-and-reference)
+* [Containerization of Source Code](#containerization-of-source-code)
+* [Command](#command)
+* [Arguments](#arguments)
+* [Formatting dtiQA\_config.csv](#formatting-dtiqa_config.csv)
+* [Example Phase Encoding Schemes](#example-phase-encoding-schemes)
+* [Quick Start](#quick-start)
+* [Options](#options)
+* [Pipeline Assumptions](#pipeline-assumptions)
+* [Pipeline Processing Steps](#pipeline-processing-steps)
+* [Pipeline Quality Assurance Steps](#pipeline-quality-assurance-steps)
+* [Outputs](#outputs)
+* [Note on Versioning for VUIIS XNAT Users](#note-on-versioning-for-vuiis-xnat-users)
+
 ## Overview
 
 ![Pipeline Overview](https://github.com/MASILab/PreQual/blob/master/pipeline_overview.png?raw=true)
