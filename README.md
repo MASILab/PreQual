@@ -6,7 +6,7 @@
 * [Authors and Reference](#authors-and-reference)
 * [Containerization of Source Code](#containerization-of-source-code)
 * [Command](#command)
-* [Arguments](#arguments)
+* [Arguments and I/O](#arguments-and-io)
 * [Formatting dtiQA\_config.csv](#formatting-dtiqa_config.csv)
 * [Example Phase Encoding Schemes](#example-phase-encoding-schemes)
 * [Quick Start](#quick-start)
@@ -79,7 +79,7 @@ We use Singularity version 3.4 with root permissions.
 * Binding the tmp directory is necessary when running the image with `--contain`.
 * `--nv` is optional. See options `--eddy_cuda` and `--eddy_extra_args`. **GPU support is currently experimental.**
 
-## Arguments
+## Arguments and I/O
 
 * **Input Directory:** The dtiQA\_config.csv file and at least one diffusion weighted image must be provided.
 
@@ -103,7 +103,7 @@ We use Singularity version 3.4 with root permissions.
 
   * Other files as needed (see `--extra_eddy_args` for more information)
 
-* **Output Directory:** Outputs listed at the end of this document
+* **Output Directory:** Outputs listed at the [end](#outputs) of this document
 
 * **pe\_axis:** Phase encoding axis of all the input images. We do NOT support different phase encoding axes between different input images at this time. The options are i and j and correspond to the first and second dimension of the input images, respectively. Note that FSL does not currently support phase encoding in the third dimension (i.e. k, the dimension in which the image slices were acquired, commonly axial for RAS and LAS oriented images). This parameter is direction AGNOSTIC. The phase encoding directions of the input images along this axis are specified in the dtiQA\_config.csv file. See "dtiQA\_config.csv Format" and “Example Phase Encoding Schemes” for more information.
 
