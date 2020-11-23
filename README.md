@@ -664,3 +664,6 @@ Folders and files in *italics* are removed if `--keep_intermediates` is NOT indi
 
     * **dtiQA.pdf** (final QA document)
 
+## Note on Versioning for VUIIS XNAT Users
+
+PreQual was developed at Vanderbilt under the project name "dtiQA v7 Multi". PreQual v1.0.0 represents dtiQA v7.2.0. Thus, on XNAT, dtiQA v7.2.x refers to PreQual v1.0.x. 
