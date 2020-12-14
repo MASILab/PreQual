@@ -19,7 +19,7 @@
 
 ## Overview
 
-![Pipeline Overview](https://github.com/MASILab/PreQual/blob/master/pipeline_overview.png?raw=true)
+![Pipeline Overview](https://github.com/MASILab/PreQual/blob/master/overview.png?raw=true)
 
 * **Summary:** Perform integrated preprocessing and quality assurance of diffusion MRI data
 
