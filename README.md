@@ -24,23 +24,26 @@
 * **Summary:** Perform integrated preprocessing and quality assurance of diffusion MRI data
 
 * **Preprocessing Steps:** 
-    1. Gibbs de-ringing (optional, not recommended)
-    1. MP-PCA denoising (optional)
-    1. Inter-scan normalization (optional)
-    1. Susceptibility-induced distortion correction (with or without reverse gradient images or field maps)
+    1. MP-PCA denoising (default on)
+    1. Gibbs de-ringing (default off)
+    1. Rician correction (default off)
+    1. Inter-scan normalization (default on)
+    1. Susceptibility-induced distortion correction, with or without reverse gradient images or field maps
     1. Eddy current-induced distortion correction
     1. Inter-volume motion correction
     1. Slice-wise signal dropout imputation
-    1. N4 bias field correction (optional)
+    1. N4 B1 bias field correction (default off)
 
 * **Quality Assurance Steps:** 
     1. Verification of phase encoding schemes
     1. Analysis of gradient directions
     1. Shell-wise analysis of signal-to-noise and contrast-to-noise ratios
-    1. Correction of corrupted inter-scan intensity relationships
+    1. Visualization of Gibbs de-ringing changes (if applicable)
+    1. Visualization of within brain intensity distributions before and after Rician correction (if applicable)
+    1. Correction (if applicable) or visualization of inter-scan intensity relationships
     1. Shell-wise analysis of distortion corrections
     1. Analysis of inter-volume motion and slice-wise signal dropout
-    1. Analysis of bias fields
+    1. Analysis of B1 bias fields (if applicable)
     1. Verification of intra-pipeline masking
     1. Analysis of tensor goodness-of-fit
     1. Voxel-wise and region-wise quantification of FA
@@ -56,7 +59,7 @@
 
     git clone https://github.com/MASILab/PreQual.git
     cd /path/to/repo/PreQual
-    git checkout v1.0.2
+    git checkout v1.0.3
     sudo singularity build /path/to/prequal.simg Singularity
 
 We use Singularity version 3.4 with root permissions.
@@ -103,7 +106,17 @@ We use Singularity version 3.4 with root permissions.
 
   * Other files as needed (see `--extra_eddy_args` for more information)
 
-* **Output Directory:** Outputs listed at the [end](#outputs) of this document
+* **Output Directory:** Full outputs listed at the [end](#outputs) of this document
+
+  * The output preprocessed images are available in the PREPROCESSED subfolder in the output directory:
+
+    * PREPROCESSED/dwmri.nii.gz
+    * PREPROCESSED/dwmri.bval
+    * PREPROCESSED/dwmri.bvec
+
+  * The QA document is available in the PDF subfolder in the output directory:
+
+    * PDF/dtiQA.pdf
 
 * **pe\_axis:** Phase encoding axis of all the input images. We do NOT support different phase encoding axes between different input images at this time. The options are i and j and correspond to the first and second dimension of the input images, respectively. Note that FSL does not currently support phase encoding in the third dimension (i.e. k, the dimension in which the image slices were acquired, commonly axial for RAS and LAS oriented images). This parameter is direction AGNOSTIC. The phase encoding directions of the input images along this axis are specified in the dtiQA\_config.csv file. See "dtiQA\_config.csv Format" and “Example Phase Encoding Schemes” for more information.
 
@@ -156,17 +169,23 @@ A comma separated list of positive integers (s/mm<sup>2</sup>) indicating nonzer
 
 Default = auto
 
-**--degibbs on/off**
-
-Remove Gibbs ringing artifacts using the local subvoxel-shifts method as [implemented in MRTrix3](https://mrtrix.readthedocs.io/en/latest/reference/commands/mrdegibbs.html). When performed it is performed prior to all other preprocessing including denoising. We strongly caution against using this feature as it not designed for the partial Fourier schemes with which most echo planar diffusion images are acquired.
-
-Default = off
-
 **--denoise on/off**
 
 Denoise images prior to preprocessing using Marchenko-Pastur PCA [implemented in MRTrix3](https://mrtrix.readthedocs.io/en/latest/reference/commands/dwidenoise.html). The SNR of the b0s of the final preprocessed images are reported in the PDF output regardless of whether this option is on or off.
 
 Default = on
+
+**--degibbs on/off**
+
+Remove Gibbs ringing artifacts using the local subvoxel-shifts method as [implemented in MRTrix3](https://mrtrix.readthedocs.io/en/latest/reference/commands/mrdegibbs.html). We caution against using this feature as it not designed for the partial Fourier schemes with which most echo planar diffusion images are acquired. It is also difficult to quality check, but we include a visualization of averaged residuals across all b = 0 s/mm<sup>2</sup> volumes, looking for larger signals near high contrast (i.e. parenchyma-CSF) interfaces.
+
+Default = off
+
+**--rician on/off**
+
+Perform Rician correction using the method of moments. We normally do not perform this step as we empirically do not find it to affect results drastically. It is also difficult to quality check, but we include a plot of the shell-wise within brain intensity distributions for each input before and after correction, looking for a slight drop in intensity with correction.
+
+Default = off
 
 **--prenormalize on/off**
 
@@ -249,7 +268,7 @@ Default = none
 
 Intensity normalize images after preprocessing by maximizing the intra-mask intensity-histogram intersections between the averaged b0s of the scans. If this option is on, these histograms before and after postnormalization will be reported in the output PDF. 
 
-Note: This option was intended for testing and is left for posterity. It is not recommended at this time.
+Note: This option was intended for testing and is left for posterity. It is not recommended at this time and will be deprecated.
 
 Default = off
 
@@ -347,15 +366,19 @@ Default = sess
 
 * No b0 drift correction is performed.
 
+* We use the fit tensor model primarily for QA. If b-values less than 500 s/mm<sup>2</sup> or greater than 1500 s/mm<sup>2</sup> are present, we suggest careful review of the fit prior to use for non-QA purposes.
+
 ## Pipeline Processing Steps
 
 1. Threshold all b-values such that values less than the `--bval_threshold` parameter are 0.
 
 1. Check that all b-vectors are unit normalized and all b-values greater than zero have associated non-zero b-vectors. For any volumes where this is not the case, we remove them, flag a warning for the output PDF, and continue the pipeline.
 
+1. If applicable, denoise all diffusion scans with `dwidenoise` (Marchenko-Pastur PCA) from MrTrix3 and save the noise profiles (needed for Rician correction later).
+
 1. If applicable, perform Gibbs de-ringing on all diffusion scans with `mrdegibbs` from MRTrix3.
 
-1. If applicable, denoise all diffusion scans with `dwidenoise` (Marchenko-Pastur PCA) from MrTrix3.
+1. If applicable, perform Rician correction on all diffusion scans with the method of moments.
 
 1. If applicable, prenormalize all diffusion scans. To accomplish this, extract all b0 images from each diffusion scan and average them. Then find a rough brain-mask with FSL’s bet and calculate an intensity scale factor such that the histogram intersection between the intra-mask histogram of the different scans’ averaged b0s to that of the first scan is maximized. Apply this scale factor to the entire diffusion weighted scan. This is done to avoid gain differences between different diffusion scans. 
 
@@ -435,6 +458,10 @@ Default = sess
 
    1. We then visualize the raw images with the interpreted phase encoding schemes.
 
+   1. If Gibbs de-ringing was run, we visualize central slices of the averaged residuals across b0 volumes before and after Gibbs de-ringing, looking for large residuals near high contrast interfaces (i.e. parenchyma against CSF)
+
+   1. If Rician correction was performed, we visualize the within brain intensity distributions of each shell of each image before and after correction, looking for downward shifts after correction.
+
    1. If Synb0-DisCo was run, we then visualize the distorted b0 (first b0 of first scan) and T1 used as inputs as well as the output susceptibility corrected b0 in their native space.
 
    1. If pre- or post-normalization was performed, we then visualize the intra-mask histograms before and after these steps as well as the calculated scaling factors. If pre-normalization is not performed, we visualize the histograms that would have been generated with pre-normalization ONLY as a check for gain differences.
@@ -443,7 +470,7 @@ Default = sess
 
    1. We plot the motion and angle correction done by eddy as well as the RMS displacement and median intensity for each volume and the volume’s associated b-value. These values are read in from an eddy output text file and we also compute and save the average of these values. In addition, we plot the outlier slices removed and then imputed by eddy as well as the chi-squared fit, with maximal bounds 0 to 0.2. The median chi-squared values are shown across volumes and slices.
 
-   1. We then plot the original raw b-vectors scaled by their b-values, the preprocessed ones output by eddy, and the optimized ones determined by dwigradcheck applied to the preprocessed ones.
+   1. We then plot the original raw b-vectors scaled by their b-values, the preprocessed ones output by eddy, and the optimized ones determined by `dwigradcheck` applied to the preprocessed ones.
 
    1. If bias field correction was performed, we then visualize the calculated fields.
 
@@ -487,6 +514,18 @@ Folders and files in *italics* are removed if `--keep_intermediates` is NOT indi
 
     * *\<imageN\>\_checked.bvec*
 
+1. *DENOISED* (these files are only created if `--denoise` is on)
+
+    * *\<image1\_%\>\_denoised.nii.gz*
+
+    * *\<image1\_%\>\_noise.nii.gz* (needed for Rician correction)
+
+        :
+
+    * *\<imageN\_%\>\_denoised.nii.gz*
+
+    * *\<imageN\_%\>\_noise.nii.gz*
+
 1. *DEGIBBS* (these files are only created if `--degibbs` is on)
 
     * *\<image1\_%\>\_degibbs.nii.gz*
@@ -495,13 +534,13 @@ Folders and files in *italics* are removed if `--keep_intermediates` is NOT indi
 
     * *\<imageN\_%\>\_degibbs.nii.gz*
 
-1. *DENOISED* (these files are only created if `--denoise` is on)
+1. *RICIAN* (these files are only created if `--rician` is on)
 
-    * *\<image1\_%\>\_denoised.nii.gz*
+    * *\<image1\_%\>\_rician.nii.gz*
 
         :
 
-    * *\<imageN\_%\>\_denoised.nii.gz*
+    * *\<imageN\_%\>\_rician.nii.gz*
 
 1. *PRENORMALIZED* (these files are only created if `--prenormalize` is on)
 
