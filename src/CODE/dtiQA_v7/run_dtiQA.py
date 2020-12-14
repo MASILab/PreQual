@@ -30,8 +30,9 @@ def main():
     parser.add_argument('pe_axis', help='Phase encoding axis (direction agnostic) (i.e. i or j)')
     parser.add_argument('--bval_threshold', metavar='N', default='50', help='Non-negative integer threshold under which to consider a b-value to be 0 (default = 50)')
     parser.add_argument('--nonzero_shells', metavar='s1,s2,...,sn/auto', default='auto', help='Comma separated list of positive integers indicating nonzero shells for SNR/CNR analysis when there are more unique b-values than shells determined by eddy or automatically determine shells by rounding to nearest 100 (default = auto)')
-    parser.add_argument('--degibbs', metavar='on/off', default='off', help='Remove Gibbs ringing artifacts from MRI images (default = off)')
     parser.add_argument('--denoise', metavar='on/off', default='on', help='Denoise images prior to preprocessing (default = on)')
+    parser.add_argument('--degibbs', metavar='on/off', default='off', help='Remove Gibbs ringing artifacts from MRI images (default = off)')
+    parser.add_argument('--rician', metavar='on/off', default='off', help='Perform Rician noise correction with method of moments (default = off)')
     parser.add_argument('--prenormalize', metavar='on/off', default='on', help='Normalize intensity distributions before preprocessing (default = on)')
     parser.add_argument('--synb0', metavar='on/off', default='on', help='Run topup with a synthetic b0 generated with Synb0-DisCo if no reverse phase encoded images are supplied and a T1 is supplied (default = on)')
     parser.add_argument('--extra_topup_args', metavar='string', default='', help='Extra arguments to pass to topup')
@@ -39,7 +40,7 @@ def main():
     parser.add_argument('--eddy_mask', metavar='on/off', default='on', help='Use a brain mask for eddy (default = on)')
     parser.add_argument('--eddy_bval_scale', metavar='N/off', default='off', help='Positive number with which to scale b-values for eddy only in order to perform distortion correction on super low shells (default = off)')
     parser.add_argument('--extra_eddy_args', metavar='string', default='', help='Extra arguments to pass to eddy')
-    parser.add_argument('--postnormalize', metavar='on/off', default='off', help='Normalize intensity distributions after preprocessing (default = off)')
+    parser.add_argument('--postnormalize', metavar='on/off', default='off', help='Normalize intensity distributions after preprocessing (deprecated, default = off)')
     parser.add_argument('--correct_bias', metavar='on/off', default='off', help='Perform N4 bias field correction as implemented in ANTS (default = off)')
     parser.add_argument('--glyph_type', metavar='tensor/vector', default='tensor', help='In the QA document, visualize the tensor model either as glyphs of the full tensors or as glyphs of the principal eigenvector (default = tensor)')
     parser.add_argument('--atlas_reg_type', metavar='FA/b0', default='FA', help='Register to the JHU atlas by using the subject FA map or the subject average preprocessed b0 (default = FA)')
@@ -99,6 +100,13 @@ def main():
         except:
             raise utils.DTIQAError('INVALID INPUT FOR --nonzero_shells PARAMETER. EXITING.')
 
+    if args.denoise == 'on':
+        params['use_denoise'] = True
+    elif args.denoise == 'off':
+        params['use_denoise'] = False
+    else:
+        raise utils.DTIQAError('INVALID INPUT FOR --denoise PARAMETER. EXITING.')
+
     if args.degibbs == 'on':
         params['use_degibbs'] = True
     elif args.degibbs == 'off':
@@ -106,12 +114,12 @@ def main():
     else:
         raise utils.DTIQAError('INVALID INPUT FOR --degibbs PARAMETER. EXITING.')
 
-    if args.denoise == 'on':
-        params['use_denoise'] = True
-    elif args.denoise == 'off':
-        params['use_denoise'] = False
+    if args.rician == 'on':
+        params['use_rician'] = True
+    elif args.rician == 'off':
+        params['use_rician'] = False
     else:
-        raise utils.DTIQAError('INVALID INPUT FOR --denoise PARAMETER. EXITING.')
+        raise utils.DTIQAError('INVALID INPUT FOR --rician PARAMETER. EXITING.')
 
     if args.prenormalize == 'on':
         params['use_prenormalize'] = True
@@ -234,8 +242,9 @@ def main():
     print('PARAMETERS:')
     print('- BValue Threshold: {}'.format(params['bval_threshold']))
     print('- Shells: {}'.format(params['shells']))
-    print('- Degibbs: {}'.format(params['use_degibbs']))
     print('- Denoise: {}'.format(params['use_denoise']))
+    print('- Degibbs: {}'.format(params['use_degibbs']))
+    print('- Rician: {}'.format(params['use_rician']))
     print('- Prenormalize: {}'.format(params['use_prenormalize']))
     print('- Extra Topup Args: {}'.format(params['extra_topup_args']))
     print('- Eddy CUDA: {}'.format(params['eddy_cuda_version']))
@@ -308,37 +317,6 @@ def main():
     print('*** DTIQA V7: BVAL/BVEC COMBOS CHECKED ({:05d}s) ***'.format(dt))
     print('***************************************************\n')
 
-    # DEGIBBS
-
-    print('**********************************')
-    print('*** DTIQA V7: STARTING DEGIBBS ***')
-    print('**********************************')
-
-    ti = time.time()
-
-    degibbs_dir = utils.make_dir(out_dir, 'DEGIBBS')
-
-    if params['use_degibbs']:
-
-        dwi_degibbs_files = []
-        for dwi_checked_file in dwi_checked_files:
-            dwi_degibbs_file, degibbs_warning_str = utils.dwi_degibbs(dwi_checked_file, degibbs_dir)
-            dwi_degibbs_files.append(dwi_degibbs_file)
-            if not degibbs_warning_str == '':
-                warning_strs.append(degibbs_warning_str)
-
-    else:
-
-        print('SKIPPING DEGIBBS')
-        dwi_degibbs_files = dwi_checked_files
-
-    tf = time.time()
-    dt = round(tf - ti)
-
-    print('********************************************')
-    print('*** DTIQA V7: FINISHED DEGIBBS ({:05d}s) ***'.format(dt))
-    print('********************************************\n')
-
     # DENOISE
 
     print('************************************')
@@ -352,16 +330,19 @@ def main():
     if params['use_denoise']:
 
         dwi_denoised_files = []
-        for dwi_degibbs_file in dwi_degibbs_files:
-            dwi_denoised_file, denoise_warning_str = utils.dwi_denoise(dwi_degibbs_file, denoised_dir)
+        dwi_noise_files = []
+        for dwi_checked_file in dwi_checked_files:
+            dwi_denoised_file, dwi_noise_file, denoise_warning_str = utils.dwi_denoise(dwi_checked_file, denoised_dir)
             dwi_denoised_files.append(dwi_denoised_file)
+            dwi_noise_files.append(dwi_noise_file)
             if not denoise_warning_str == '':
                 warning_strs.append(denoise_warning_str)
 
     else:
 
         print('SKIPPING DENOISING')
-        dwi_denoised_files = dwi_degibbs_files
+        dwi_denoised_files = dwi_checked_files
+        dwi_noise_files = ['' for i in range(len(dwi_denoised_files))]
 
     tf = time.time()
     dt = round(tf - ti)
@@ -369,6 +350,68 @@ def main():
     print('*********************************************')
     print('*** DTIQA V7: FINISHED DENOISING ({:05d}s) ***'.format(dt))
     print('*********************************************\n')
+
+    # DEGIBBS
+
+    print('**********************************')
+    print('*** DTIQA V7: STARTING DEGIBBS ***')
+    print('**********************************')
+
+    ti = time.time()
+
+    degibbs_dir = utils.make_dir(out_dir, 'DEGIBBS')
+
+    if params['use_degibbs']:
+
+        dwi_degibbs_files = []
+        for dwi_denoised_file in dwi_denoised_files:
+            dwi_degibbs_file, degibbs_warning_str = utils.dwi_degibbs(dwi_denoised_file, degibbs_dir)
+            dwi_degibbs_files.append(dwi_degibbs_file)
+            if not degibbs_warning_str == '':
+                warning_strs.append(degibbs_warning_str)
+
+    else:
+
+        print('SKIPPING DEGIBBS')
+        dwi_degibbs_files = dwi_denoised_files
+
+    tf = time.time()
+    dt = round(tf - ti)
+
+    print('********************************************')
+    print('*** DTIQA V7: FINISHED DEGIBBS ({:05d}s) ***'.format(dt))
+    print('********************************************\n')
+
+    # RICIAN
+
+    print('********************************************')
+    print('*** DTIQA V7: STARTING RICIAN CORRECTION ***')
+    print('********************************************')
+
+    ti = time.time()
+
+    rician_dir = utils.make_dir(out_dir, 'RICIAN')
+
+    if params['use_rician']:
+
+        dwi_rician_files = []
+        for i in range(len(dwi_degibbs_files)):
+            dwi_rician_file, rician_warning_str = utils.dwi_rician(dwi_degibbs_files[i], dwi_noise_files[i], rician_dir)
+            dwi_rician_files.append(dwi_rician_file)
+            if not rician_warning_str == '':
+                warning_strs.append(rician_warning_str)
+
+    else:
+
+        print('SKIPPING RICIAN CORRECTION')
+        dwi_rician_files = dwi_degibbs_files
+
+    tf = time.time()
+    dt = round(tf - ti)
+
+    print('******************************************************')
+    print('*** DTIQA V7: FINISHED RICIAN CORRECTION ({:05d}s) ***'.format(dt))
+    print('******************************************************\n')
 
     # PRENORMALIZE OR GAIN CALCULATIONS
 
@@ -384,11 +427,11 @@ def main():
         print('RUNNING PRENORMALIZATION ALGORITHMS FOR GAIN CALCULATIONS ONLY. PRENORMALIZATION WILL NOT BE APPLIED TO IMAGES.')
         prenorm_dir = utils.make_dir(out_dir, 'GAIN_CHECK')
 
-    dwi_prenorm_files, dwi_prenorm_gains, dwi_prenorm_bins, dwi_denoised_hists, dwi_prenormed_hists = \
-        utils.dwi_norm(dwi_denoised_files, bvals_checked_files, prenorm_dir)
+    dwi_prenorm_files, dwi_prenorm_gains, dwi_prenorm_bins, dwi_input_hists, dwi_prenormed_hists = \
+        utils.dwi_norm(dwi_rician_files, bvals_checked_files, prenorm_dir)
 
     if not params['use_prenormalize']:
-        dwi_prenorm_files = dwi_denoised_files
+        dwi_prenorm_files = dwi_rician_files
         for dwi_prenorm_gain in dwi_prenorm_gains:
             if dwi_prenorm_gain > 1.05 or dwi_prenorm_gain < 0.95:
                 print('PRENORMALIZE IS OFF AND GAINS > 5% WERE DETECTED!')
@@ -652,9 +695,11 @@ def main():
     if not cnr_warning_str == '':
         warning_strs.append(cnr_warning_str)
     
-    roi_names, roi_med_fa, atlas2subj_file, cc_center_voxel, fa_stats_out_list = stats.scalar_info(dwi_preproc_file, bvals_preproc_file, fa_file, md_file, ad_file, rd_file, stats_dir, reg_type=params['atlas_reg_type'])
+    roi_names, roi_med_fa, atlas2subj_file, cc_center_voxel, scalar_stats_out_list, scalar_info_warning_str = stats.scalar_info(dwi_preproc_file, bvals_preproc_file, fa_file, md_file, ad_file, rd_file, stats_dir, reg_type=params['atlas_reg_type'])
+    if not scalar_info_warning_str == '':
+        warning_strs.append(scalar_info_warning_str)
 
-    stats.stats_out(motion_stats_out_list, cnr_stats_out_list, fa_stats_out_list, stats_dir)
+    stats.stats_out(motion_stats_out_list, cnr_stats_out_list, scalar_stats_out_list, stats_dir)
 
     opt_dir = utils.make_dir(out_dir, 'OPTIMIZED_BVECS')
 
@@ -681,13 +726,17 @@ def main():
 
     title_vis_file = vis.vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, use_synb0, params, warning_strs, vis_dir)
     pedir_vis_file = vis.vis_pedir(dwi_checked_files, bvals_checked_files, pe_axis, pe_dirs, vis_dir)
+    if params['use_degibbs']:
+        degibbs_vis_file = vis.vis_degibbs(dwi_denoised_files, bvals_checked_files, dwi_degibbs_files, dwi_prenorm_gains, vis_dir)
+    if params['use_rician']:
+        rician_vis_file = vis.vis_rician(dwi_degibbs_files, bvals_checked_files, dwi_rician_files, dwi_prenorm_gains, bvals_preproc_shelled, vis_dir)
     if use_synb0:
         synb0_vis_file = vis.vis_synb0(b0_d_file, t1_file, b0_syn_file, vis_dir)
     if params['use_prenormalize']:
         prenorm_label = 'Prenormalization'
     else:
-        prenorm_label = 'Gain QA of {}Inputs'.format('Denoised ' if params['use_denoise'] else '')
-    prenorm_vis_file = vis.vis_norm(dwi_denoised_files, dwi_prenorm_files, dwi_prenorm_gains, dwi_prenorm_bins, dwi_denoised_hists, dwi_prenormed_hists, prenorm_label, vis_dir)
+        prenorm_label = 'Gain QA of Inputs'
+    prenorm_vis_file = vis.vis_norm(dwi_rician_files, dwi_prenorm_files, dwi_prenorm_gains, dwi_prenorm_bins, dwi_input_hists, dwi_prenormed_hists, prenorm_label, vis_dir)
     prenorm_vis_file = utils.rename_file(prenorm_vis_file, os.path.join(vis_dir, 'prenorm.pdf'))
     if params['use_postnormalize']:
         norm_vis_file = vis.vis_norm(dwi_eddy_files, dwi_norm_files, dwi_norm_gains, dwi_norm_bins, dwi_eddy_hists, dwi_normed_hists, 'Postnormalization', vis_dir)
@@ -698,15 +747,19 @@ def main():
         bias_vis_file = vis.vis_bias(dwi_norm_file, bvals_norm_file, dwi_unbiased_file, bias_field_file, vis_dir)
     dwi_vis_files = vis.vis_dwi(dwi_preproc_file, bvals_preproc_shelled, bvecs_preproc_file, cnr_dict, vis_dir)
     glyph_vis_file = vis.vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_type=params['glyph_type'])
-    fa_vis_file = vis.vis_scalar(fa_file, vis_dir, name='FA')
+    fa_vis_file = vis.vis_scalar(fa_file, vis_dir, name='FA', comment='White matter should be bright')
     fa_stats_vis_file = vis.vis_fa_stats(roi_names, roi_med_fa, fa_file, atlas2subj_file, vis_dir)
-    md_vis_file = vis.vis_scalar(md_file, vis_dir, name='MD')
+    md_vis_file = vis.vis_scalar(md_file, vis_dir, name='MD', comment='CSF should be bright')
 
     # Combine component PDFs
 
     vis_files = []
     vis_files.append(title_vis_file)
     vis_files.append(pedir_vis_file)
+    if params['use_degibbs']:
+        vis_files.append(degibbs_vis_file)
+    if params['use_rician']:
+        vis_files.append(rician_vis_file)
     vis_files.append(prenorm_vis_file) # prenorm_vis_file = prenorm or gain check histograms
     if params['use_postnormalize']:
         vis_files.append(norm_vis_file)
@@ -787,6 +840,12 @@ def main():
 
         print('CLEARING DENOISED DATA')
         utils.remove_dir(denoised_dir)
+
+        print('CLEARING DEGIBBS DATA')
+        utils.remove_dir(degibbs_dir)
+
+        print('CLEARING RICIAN DATA')
+        utils.remove_dir(rician_dir)
 
         print('CLEARING {} DATA'.format('PRENORMALIZED' if params['use_prenormalize'] else 'GAIN CHECK'))
         utils.remove_dir(prenorm_dir)

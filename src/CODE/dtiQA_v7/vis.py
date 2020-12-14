@@ -43,8 +43,9 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
     str('Parameters:\n'
         '- B-Value Threshold: {}\n'
         '- Shells: {}\n'
-        '- Run Degibbs: {}\n'
         '- Run Denoise: {}\n'
+        '- Run Degibbs: {}\n'
+        '- Run Rician: {}\n'
         '- Run Prenormalize: {}\n'
         '- Try Synb0-DisCo: {}\n'
         '- Extra Topup Args: {}\n'
@@ -59,8 +60,9 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
         '- Keep Intermediates: {}\n'
         .format(params['bval_threshold'],
                 params['shells'] if len(params['shells']) > 0 else 'Auto',
-                params['use_degibbs'],
                 params['use_denoise'],
+                params['use_degibbs'],
+                params['use_rician'],
                 params['use_prenormalize'],
                 params['use_synb0_user'],
                 params['extra_topup_args'],
@@ -438,6 +440,206 @@ def vis_bias(dwi_file, bvals_file, dwi_unbiased_file, bias_field_file, vis_dir):
 
     return bias_vis_file
 
+def vis_degibbs(dwi_files, bvals_files, dwi_degibbs_files, gains, vis_dir):
+
+    temp_dir = utils.make_dir(vis_dir, 'TEMP')
+
+    print('VISUALIZING DEGIBBS')
+
+    # Scale all inputs by prenormalization gains
+
+    dwi_scaled_files = []
+    dwi_degibbs_scaled_files = []
+    for i in range(len(dwi_files)):
+        # Pregibbs
+        dwi_prefix = utils.get_prefix(dwi_files[i], file_ext='nii')
+        dwi_img, dwi_aff, _ = utils.load_nii(dwi_files[i])
+        dwi_scaled_img = dwi_img * gains[i]
+        dwi_scaled_file = os.path.join(temp_dir, '{}_scaled.nii.gz'.format(dwi_prefix))
+        utils.save_nii(dwi_scaled_img, dwi_aff, dwi_scaled_file)
+        dwi_scaled_files.append(dwi_scaled_file)
+        # Postgibbs
+        dwi_degibbs_prefix = utils.get_prefix(dwi_degibbs_files[i], file_ext='nii')
+        dwi_degibbs_img, dwi_degibbs_aff, _ = utils.load_nii(dwi_degibbs_files[i])
+        dwi_degibbs_scaled_img = dwi_degibbs_img * gains[i]
+        dwi_degibbs_scaled_file = os.path.join(temp_dir, '{}_scaled.nii.gz'.format(dwi_degibbs_prefix))
+        utils.save_nii(dwi_degibbs_scaled_img, dwi_degibbs_aff, dwi_degibbs_scaled_file)
+        dwi_degibbs_scaled_files.append(dwi_degibbs_scaled_file)
+
+    # Load common bvals
+
+    gibbs_bval_file = utils.bvals_merge(bvals_files, 'gibbs', temp_dir)
+
+    # Load pregibbs b0s, scaled by prenorm gains
+
+    pregibbs_prefix = 'pregibbs_scaled'
+    pregibbs_dwi_file = utils.dwi_merge(dwi_scaled_files, pregibbs_prefix, temp_dir)
+    pregibbs_b0s_file, _, _ = utils.dwi_extract(pregibbs_dwi_file, gibbs_bval_file, temp_dir, target_bval=0, first_only=False)
+    pregibbs_b0s_img, gibbs_b0s_aff, _ = utils.load_nii(pregibbs_b0s_file, ndim=4)
+
+    # Load postgibbs b0s, scaled by prenorm gains
+
+    postgibbs_prefix = 'postgibbs_scaled'
+    postgibbs_dwi_file = utils.dwi_merge(dwi_degibbs_scaled_files, postgibbs_prefix, temp_dir)
+    postgibbs_b0s_file, _, _ = utils.dwi_extract(postgibbs_dwi_file, gibbs_bval_file, temp_dir, target_bval=0, first_only=False)
+    postgibbs_b0s_img, _, _ = utils.load_nii(postgibbs_b0s_file, ndim=4)
+
+    # Calculate average absolute residuals
+
+    res_img = np.nanmean(np.abs(postgibbs_b0s_img - pregibbs_b0s_img), axis=3)
+    res_aff = gibbs_b0s_aff
+    res_file = os.path.join(temp_dir, 'gibbs_residuals.nii.gz')
+    utils.save_nii(res_img, res_aff, res_file, ndim=3)
+
+    # Plot 5 central triplanar views
+
+    res_slices, res_vox_dim, res_min, res_max = utils.slice_nii(res_file, offsets=[-10, -5, 0, 5, 10], min_intensity=0, max_percentile=99)
+    temp_vis_file = _vis_vol(res_slices, res_vox_dim, res_min, res_max, temp_dir, name='Gibbs_Deringing:_Averaged_Residuals_of_b_=_0_Volumes', comment='Residuals should be larger at high-contrast interfaces', colorbar=False)
+    degibbs_vis_file = utils.rename_file(temp_vis_file, os.path.join(vis_dir, 'degibbs.pdf'))
+
+    # Finish Up
+
+    utils.remove_dir(temp_dir)
+
+    return degibbs_vis_file
+
+def vis_rician(dwi_files, bvals_files, dwi_rician_files, gains, shells, vis_dir):
+
+    temp_dir = utils.make_dir(vis_dir, 'TEMP')
+
+    print('VISUALIZING RICIAN CORRECTION')
+
+    # For each input...
+
+    dwi_scaled_files = []
+    dwi_rician_scaled_files = []
+    bvals_shelled_files = []
+    shells = np.unique(shells)
+    for i in range(len(dwi_files)):
+        # Prerician
+        dwi_prefix = utils.get_prefix(dwi_files[i], file_ext='nii')
+        dwi_img, dwi_aff, _ = utils.load_nii(dwi_files[i])
+        dwi_scaled_img = dwi_img * gains[i] # ...scale by prenormalization gains...
+        dwi_scaled_file = os.path.join(temp_dir, '{}_scaled.nii.gz'.format(dwi_prefix))
+        utils.save_nii(dwi_scaled_img, dwi_aff, dwi_scaled_file)
+        dwi_scaled_files.append(dwi_scaled_file)
+        # Postrician
+        dwi_rician_prefix = utils.get_prefix(dwi_rician_files[i], file_ext='nii')
+        dwi_rician_img, dwi_rician_aff, _ = utils.load_nii(dwi_rician_files[i])
+        dwi_rician_scaled_img = dwi_rician_img * gains[i] # ...scale by prenormalization gains...
+        dwi_rician_scaled_file = os.path.join(temp_dir, '{}_scaled.nii.gz'.format(dwi_rician_prefix))
+        utils.save_nii(dwi_rician_scaled_img, dwi_rician_aff, dwi_rician_scaled_file)
+        dwi_rician_scaled_files.append(dwi_rician_scaled_file)
+        # Bvals
+        bvals_prefix = utils.get_prefix(bvals_files[i], file_ext='bval')
+        bvals = utils.load_txt(bvals_files[i], txt_type='bvals')
+        for j in range(len(bvals)):
+            bvals[j] = utils.nearest(bvals[j], shells) # ...and round all bvals to the nearest shell.
+        bvals_shelled_file = os.path.join(temp_dir, '{}_shelled.bval'.format(bvals_prefix))
+        utils.save_txt(bvals, bvals_shelled_file)
+        bvals_shelled_files.append(bvals_shelled_file)
+
+    # For each image, calculate a distribution of intramask (csf or brain) intensities for each shell
+
+    rician_labels = [] # labels to track the images/shells from which histograms come from
+    rician_bins = [] # bins to track the x-axis of the histograms
+    prerician_hists = [] # hists to track the histograms
+    postrician_hists = []
+    
+    for i in range(len(dwi_scaled_files)): # iterate through images
+
+        rician_labels.append([]) # each image needs a list of shell labels
+        rician_bins.append([]) # each image needs a list of histogram x-axes
+        prerician_hists.append([]) # each image needs a list of histograms (y-axes)
+        postrician_hists.append([])
+
+        bvals = utils.load_txt(bvals_shelled_files[i]) # iterate through non-zero shells
+        bvals_unique = np.sort(np.unique(bvals[bvals!=0]))
+        for bval in bvals_unique:
+
+            # record shell being investigated
+            rician_labels[i].append(bval) 
+
+            # extract volumes from that shell
+            dwi_shell_file, _, _ = utils.dwi_extract(dwi_scaled_files[i], bvals_shelled_files[i], temp_dir, target_bval=bval, first_only=False) 
+            dwi_rician_shell_file, _, _ = utils.dwi_extract(dwi_rician_scaled_files[i], bvals_shelled_files[i], temp_dir, target_bval=bval, first_only=False)
+            
+            # generate bg mask
+            dwi_b0s_file, _, _ = utils.dwi_extract(dwi_scaled_files[i], bvals_shelled_files[i], temp_dir, target_bval=0, first_only=False) 
+            dwi_b0s_avg_file = utils.dwi_avg(dwi_b0s_file, temp_dir)
+            dwi_mask_file = utils.dwi_mask(dwi_b0s_avg_file, temp_dir)
+            dwi_mask_img = utils.load_nii(dwi_mask_file, dtype='bool', ndim=3)[0]
+
+            # # CSF Mask
+            #
+            # # calculate a csf mask after masking out background: mask bg of avg shell image
+            # dwi_shell_avg_file = utils.dwi_avg(dwi_shell_file, temp_dir) 
+            # dwi_shell_avg_img, dwi_shell_avg_aff, _ = utils.load_nii(dwi_shell_avg_file)
+            # dwi_shell_avg_img[np.logical_not(dwi_mask_img)] = 0
+            # dwi_shell_avg_masked_file = os.path.join(temp_dir, '{}_masked.nii.gz'.format(utils.get_prefix(dwi_shell_avg_file, file_ext='nii')))
+            # utils.save_nii(dwi_shell_avg_img, dwi_shell_avg_aff, dwi_shell_avg_masked_file)
+            #
+            # # calculate a csf mask after masking out background: get csf mask from bg-masked avg shell image
+            # fast_prefix = '{}_fast'.format(utils.get_prefix(dwi_shell_avg_masked_file, file_ext='nii'))
+            # fast_cmd = 'fast -o {} -v {}'.format(os.path.join(temp_dir, fast_prefix), dwi_shell_avg_masked_file)
+            # utils.run_cmd(fast_cmd)
+            # csf_file = os.path.join(temp_dir, '{}_pve_0.nii.gz'.format(fast_prefix))
+            # csf_img = utils.load_nii(csf_file, ndim=4)[0]
+            #
+            # # Apply csf masks
+            # dwi_shell_img, _, _ = utils.load_nii(dwi_shell_file, ndim=4) # load in volumes and prep mask
+            # dwi_rician_shell_img, _, _ = utils.load_nii(dwi_rician_shell_file, ndim=4)
+            # mask_img = np.tile(csf_img, [1, 1, 1, dwi_shell_img.shape[3]]) > 0.5
+
+            # Brain Mask
+
+            dwi_shell_img, _, _ = utils.load_nii(dwi_shell_file, ndim=4)
+            dwi_rician_shell_img, _, _ = utils.load_nii(dwi_rician_shell_file, ndim=4)
+            mask_img = np.tile(np.expand_dims(dwi_mask_img, axis=3), [1, 1, 1, dwi_shell_img.shape[3]])
+
+            # Calculate histograms across all volumes of that shell with mask
+            dwi_shell_intensities = dwi_shell_img[mask_img]
+            dwi_rician_shell_intensities = dwi_rician_shell_img[mask_img]
+            common_min_intensity = 0
+            common_max_intensity = np.amax((np.amax(np.nanpercentile(dwi_shell_intensities, 99)), np.amax(np.nanpercentile(dwi_rician_shell_intensities, 99))))
+            bins = np.linspace(common_min_intensity, common_max_intensity, 100)
+            prerician_hist, _ = np.histogram(dwi_shell_intensities, bins=bins)
+            postrician_hist, _ = np.histogram(dwi_rician_shell_intensities, bins=bins)
+            prerician_hists[i].append(prerician_hist) # record histograms
+            postrician_hists[i].append(postrician_hist)
+            rician_bins[i].append(bins[:-1]) # record bins
+
+    # Plot histograms
+
+    fig = plt.figure(0, figsize=SHARED_VARS.PAGESIZE)
+    num_subplots = len(rician_labels)
+
+    for i in range(num_subplots):
+        plt.subplot(num_subplots, 1, i+1)
+        for j in range(len(rician_labels[i])):
+            plt.plot(rician_bins[i][j], prerician_hists[i][j], label='b = {} (Without)'.format(rician_labels[i][j]))
+            plt.plot(rician_bins[i][j], postrician_hists[i][j], label='b = {} (With)'.format(rician_labels[i][j]))
+        plt.legend()
+        plt.title(utils.get_prefix(dwi_files[i], file_ext='nii'), fontsize=SHARED_VARS.LABEL_FONTSIZE)
+        plt.ylabel('Frequency', fontsize=SHARED_VARS.LABEL_FONTSIZE)
+        plt.xlabel('Intensity', fontsize=SHARED_VARS.LABEL_FONTSIZE)
+        plt.grid()
+
+    plt.tight_layout()
+
+    plt.subplots_adjust(top=0.85)
+    plt.suptitle('Intramask Intensity Distributions With and Without Rician Correction\n(Intensities should decrease slightly with correction)', fontsize=SHARED_VARS.TITLE_FONTSIZE)
+
+    rician_vis_file = os.path.join(vis_dir, 'rician.pdf')
+    plt.savefig(rician_vis_file, dpi=SHARED_VARS.PDF_DPI)
+    plt.close()
+
+    # Finish Up
+
+    utils.remove_dir(temp_dir)
+    
+    return rician_vis_file
+
 def vis_stats(dwi_file, bvals_file, mask_file, chisq_matrix_file, motion_dict, eddy_dir, vis_dir):
 
     print('VISUALIZING MOTION AND CHI SQUARED STATISTICS')
@@ -674,7 +876,7 @@ def vis_dwi(dwi_file, bvals_shelled, bvecs_file, cnr_dict, vis_dir):
 
     return dwi_vis_files
 
-def vis_scalar(scalar_file, vis_dir, name='?'):
+def vis_scalar(scalar_file, vis_dir, name='?', comment=''):
 
     print('VISUALIZING {} SCALAR MAP'.format(name))
     
@@ -685,7 +887,7 @@ def vis_scalar(scalar_file, vis_dir, name='?'):
         scalar_max = SHARED_VARS.ADC_WATER
     
     scalar_slices, scalar_vox_dim, _, _ = utils.slice_nii(scalar_file, offsets=[-10, -5, 0, 5, 10])
-    scalar_vis_file = _vis_vol(scalar_slices, scalar_vox_dim, scalar_min, scalar_max, vis_dir, name=name, colorbar=True)
+    scalar_vis_file = _vis_vol(scalar_slices, scalar_vox_dim, scalar_min, scalar_max, vis_dir, name=name, comment=comment, colorbar=True)
     
     return scalar_vis_file
 
@@ -844,18 +1046,23 @@ def _methods_strs(use_topup, use_synb0, params):
     c += 3
 
     s.append('First, any volumes with a corresponding b value less than {} were treated as b0 volumes for the remainder of the pipeline.'.format(params['bval_threshold']))
-    
+
+    if params['use_denoise']:
+        s.append('The diffusion data were denoised with the provided dwidenoise (MP-PCA) function included with MRTrix3 [{}][{}][{}].'.format(c, c+1, c+2))
+        r.append('[{}] Veraart, J. et al. (2016). Denoising of diffusion MRI using random matrix theory. Neuroimage, 142, 394-406.'.format(c))
+        r.append('[{}] Veraart, J. et al. (2016). Diffusion MRI noise mapping using random matrix theory. Magnetic resonance in medicine, 76(5), 1582-1593.'.format(c+1))
+        r.append('[{}] Cordero-Grande, L. et al. (2019). Complex diffusion-weighted image estimation via matrix recovery under general noise models. NeuroImage, 200, 391-404.'.format(c+2))             
+        c += 3
+
     if params['use_degibbs']:
         s.append('Gibbs de-ringing followed with the local subvoxel-shifts method [{}].'.format(c))
         r.append('[{}] Kellner, E. et al. (2016). Gibbs‐ringing artifact removal based on local subvoxel‐shifts. Magnetic resonance in medicine, 76(5), 1574-1581.'.format(c))
         c += 1
 
-    if params['use_denoise']:
-        s.append('Then, the diffusion data were denoised with the provided dwidenoise function included with MRTrix3 [{}][{}][{}].'.format(c, c+1, c+2))
-        r.append('[{}] Veraart, J. et al. (2016). Denoising of diffusion MRI using random matrix theory. Neuroimage, 142, 394-406.'.format(c))
-        r.append('[{}] Veraart, J. et al. (2016). Diffusion MRI noise mapping using random matrix theory. Magnetic resonance in medicine, 76(5), 1582-1593.'.format(c+1))
-        r.append('[{}] Cordero-Grande, L. et al. (2019). Complex diffusion-weighted image estimation via matrix recovery under general noise models. NeuroImage, 200, 391-404.'.format(c+2))             
-        c += 3
+    if params['use_rician']:
+        s.append('Rician correction was performed with the method of moments [{}].'.format(c))
+        r.append('[{}] Koay, C. G. et al. (2006). Analytically exact correction scheme for signal extraction from noisy magnitude MR signals. Journal of magnetic resonance, 179(2), 317-322.'.format(c))
+        c += 1
 
     s.append('The images were then {}concatenated for further processing.'.format('intensity-normalized to the first image and ' if params['use_prenormalize'] else ''))
     
@@ -919,9 +1126,11 @@ def _methods_strs(use_topup, use_synb0, params):
 
     return s, r
 
-def _vis_vol(slices, vox_dim, min, max, vis_dir, name='?', colorbar=False):
+def _vis_vol(slices, vox_dim, min, max, vis_dir, name='?', comment='', colorbar=False):
 
     title = name.replace('_', ' ')
+    if not comment == '':
+        title = '{}\n({})'.format(title, comment)
 
     print('VISUALIZING 3D VOLUME: {}'.format(name))
 

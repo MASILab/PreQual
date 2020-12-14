@@ -250,10 +250,11 @@ def dwi_denoise(dwi_file, denoised_dir):
     print('DENOISING {}...'.format(dwi_prefix))
 
     dwi_denoised_file = os.path.join(denoised_dir, '{}_denoised.nii.gz'.format(dwi_prefix))
+    dwi_noise_file = os.path.join(denoised_dir, '{}_noise.nii.gz'.format(dwi_prefix))
 
     dwi_img, _, _ = load_nii(dwi_file, ndim=4)
     if dwi_img.shape[3] > 1:
-        denoise_cmd = 'dwidenoise {} {} -force -nthreads {}'.format(dwi_file, dwi_denoised_file, SHARED_VARS.NUM_THREADS-1)
+        denoise_cmd = 'dwidenoise {} {} -noise {} -force -nthreads {}'.format(dwi_file, dwi_denoised_file, dwi_noise_file, SHARED_VARS.NUM_THREADS-1)
         run_cmd(denoise_cmd)
         denoise_warning_str = ''
     else:
@@ -263,7 +264,48 @@ def dwi_denoise(dwi_file, denoised_dir):
 
     print('FINISHED DENOISING {}'.format(dwi_prefix))
 
-    return dwi_denoised_file, denoise_warning_str
+    return dwi_denoised_file, dwi_noise_file, denoise_warning_str
+
+def dwi_rician(dwi_file, noise_file, rician_dir):
+
+    temp_dir = make_dir(rician_dir, 'TEMP')
+
+    dwi_prefix = get_prefix(dwi_file, file_ext='nii')
+
+    print('REMOVING RICIAN BIAS FROM {}...'.format(dwi_prefix))
+
+    if noise_file == '':
+        print('NO NOISE VOLUME PROVIDED, RUNNING MP-PCA DENOISING TO CALCULATE, BUT MP-PCA DENOISING NOT APPLIED.')
+        _, noise_file, _ = dwi_denoise(dwi_file, temp_dir)
+
+    # Set NaNs and Infs in noise to zero so magnitude isn't affected
+
+    noise_prefix = get_prefix(noise_file, file_ext='nii')
+    clean_noise_file = os.path.join(temp_dir, '{}_clean.nii.gz'.format(noise_prefix))
+    clean_cmd = 'mrcalc {} -finite {} 0 -if {} -force -nthreads {}'.format(noise_file, noise_file, clean_noise_file, SHARED_VARS.NUM_THREADS-1)
+    run_cmd(clean_cmd)
+
+    # Run Method of Moments: I' = sqrt(I^2 - n^2), I = image, n = noise
+
+    dwi_raw_rician_file = os.path.join(temp_dir, '{}_raw_rician.nii.gz'.format(dwi_prefix))
+    rician_cmd = 'mrcalc {} 2 -pow {} 2 -pow -sub -abs -sqrt {} -force -nthreads {}'.format(dwi_file, clean_noise_file, dwi_raw_rician_file, SHARED_VARS.NUM_THREADS-1)
+    run_cmd(rician_cmd)
+
+    # Set non-finite/imaginary/NaNs in corrected output to NaN
+    
+    dwi_rician_file = os.path.join(rician_dir, '{}_rician.nii.gz'.format(dwi_prefix))
+    clean_cmd = 'mrcalc {} -finite {} NaN -if {} -force -nthreads {}'.format(dwi_raw_rician_file, dwi_raw_rician_file, dwi_rician_file, SHARED_VARS.NUM_THREADS-1)
+    run_cmd(clean_cmd)
+
+    # Finish Up
+
+    rician_warning_str = ''
+
+    remove_dir(temp_dir)
+
+    print('FINISHED RICIAN CORRECTION FOR {}'.format(dwi_prefix))
+
+    return dwi_rician_file, rician_warning_str
 
 def dwi_degibbs(dwi_file, degibbs_dir):
 
@@ -274,7 +316,7 @@ def dwi_degibbs(dwi_file, degibbs_dir):
     dwi_degibbs_file = os.path.join(degibbs_dir, '{}_degibbs.nii.gz'.format(dwi_prefix))
     degibbs_cmd = 'mrdegibbs {} {} -force -nthreads {}'.format(dwi_file, dwi_degibbs_file, SHARED_VARS.NUM_THREADS-1)
     run_cmd(degibbs_cmd)
-    degibbs_warning_str = 'Gibbs de-ringing applied to {}. Because it can be unstable for partial Fourier acquisitions, we do NOT recommend this for most EPI images. It can also be very difficult to QA, so please carefully check the data in the DEGIBBS output folder.'.format(dwi_prefix)
+    degibbs_warning_str = 'Gibbs de-ringing applied to {}. Because it can be unstable for partial Fourier acquisitions, we do NOT recommend this for most EPI images. It can also be very difficult to QA, so please carefully check the data in the DEGIBBS output folder in addition to the corresponding page in this PDF.'.format(dwi_prefix)
 
     print('FINISHED DEGIBBS {}'.format(dwi_prefix))
 
@@ -666,9 +708,9 @@ def slice_nii(nii_file, offsets=[0], custom_aff=[], min_percentile=0, max_percen
 
     # Extract center triplanar slices with offsets.
 
-    i0 = round(img.shape[0] / 2)
-    i1 = round(img.shape[1] / 2)
-    i2 = round(img.shape[2] / 2)
+    i0 = int(round(img.shape[0] / 2, 1))
+    i1 = int(round(img.shape[1] / 2, 1))
+    i2 = int(round(img.shape[2] / 2, 1))
 
     i0s = []
     i1s = []
@@ -742,7 +784,23 @@ def merge_pdfs(pdf_files, merged_prefix, pdf_dir):
 
     return merged_pdf_file
 
-# Helper Functions
+# Function Definitions: Math Helper Functions
+
+def nearest(value, array):
+
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return array[idx]
+
+def round(num, base):
+
+    d = num / base
+    if d % 1 >= 0.5:
+        return base*np.ceil(d)
+    else:
+        return base*np.floor(d)
+
+# Private Helper Functions
 
 def _calc_gain(img_ref, img_in):
 

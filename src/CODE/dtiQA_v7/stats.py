@@ -193,9 +193,9 @@ def cnr(dwi_file, bvals_file, mask_file, eddy_dir, stats_dir, shells=[]):
         bvals_rounded = []
         for bval in bvals:
             if len(shells) > 0:
-                bvals_rounded.append(_nearest(bval, shells))
+                bvals_rounded.append(utils.nearest(bval, shells))
             else:
-                bvals_rounded.append(_round(bval, 100))
+                bvals_rounded.append(utils.round(bval, 100))
         bvals_unique = np.sort(np.unique(bvals_rounded))
         bvals = bvals_rounded # will need to return bvals "shelled" for visualization of the volumes to match the SNR/CNR shells
         cnr_warning_str = 'For SNR/CNR analysis, the number of unique b-values after preprocessing was not equal to the number of shells determined by eddy. B-values were {} for analysis in an attempt to match eddy.'.format('rounded to the nearest 100' if len(shells) == 0 else 'matched to nearest supplied shell')
@@ -337,7 +337,14 @@ def scalar_info(dwi_file, bvals_file, fa_file, md_file, ad_file, rd_file, stats_
     cc_locs = np.column_stack(np.where(cc_index))
     cc_center_voxel = (np.nanmean(cc_locs[:, 0]), np.nanmean(cc_locs[:, 1]), np.nanmean(cc_locs[:, 2]))
 
-    return roi_names, roi_med_fa, atlas2subj_file, cc_center_voxel, stats_out_list
+    # Check for b-values that may be too high to allow for generalization of stats past QA
+
+    scalar_info_warning_str = ''
+    bvals = utils.load_txt(bvals_file, txt_type='bvals')
+    if np.amax(bvals) > 1500 or np.amin(bvals[bvals > 0]) < 500:
+        scalar_info_warning_str = 'b-values less than 500 or greater than 1500 s/mm2 detected. We recommend careful review of tensor fits prior to using them for purposes other than QA.'
+
+    return roi_names, roi_med_fa, atlas2subj_file, cc_center_voxel, stats_out_list, scalar_info_warning_str
 
 def stats_out(motion_stats_out_list, cnr_stats_out_list, fa_stats_out_list, stats_dir):
     
@@ -378,20 +385,6 @@ def gradcheck(dwi_file, bvals_file, bvecs_file, mask_file, corr_dir):
     return corrected_bvals_file, corrected_bvecs_file
 
 # Helper Functions
-
-def _nearest(value, array):
-
-    array = np.asarray(array)
-    idx = (np.abs(array - value)).argmin()
-    return array[idx]
-
-def _round(num, base):
-
-    d = num / base
-    if d % 1 >= 0.5:
-        return base*np.ceil(d)
-    else:
-        return base*np.floor(d)
 
 def _erode_mask(mask_img):
 
