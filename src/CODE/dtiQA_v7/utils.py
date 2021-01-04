@@ -841,19 +841,22 @@ def _radiological_view(img, aff, vox_dim=(1, 1, 1)):
     # https://users.fmrib.ox.ac.uk/~paulmc/fsleyes/userdoc/latest/display_space.html#radiological-vs-neurological
     # https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/Orientation%20Explained
 
-    orientations = nib.orientations.io_orientation(aff)
-    for orientation in orientations:
-        if (orientation[1] == 1 and orientation[0] == 0) or (orientation[1] == -1 and orientation[0] > 0):
-            img = nib.orientations.flip_axis(img, axis=orientation[0].astype('int'))
-    old_axis_order = np.array(orientations[:, 0])
+    orientations = nib.orientations.io_orientation(aff) # Get orientations relative to RAS in nibabel
+
+    old_axis_order = np.array(orientations[:, 0]) # Permute to get RL, AP, IS axes in right order
     new_axis_order = np.array([0, 1, 2])
     permute_axis_order = list(np.array([new_axis_order[old_axis_order == 0],
                                         new_axis_order[old_axis_order == 1],
                                         new_axis_order[old_axis_order == 2]]).flatten())
     img = np.transpose(img, axes=permute_axis_order)
+    orientations_permute = orientations[permute_axis_order]
 
-    vox_dim = np.array(vox_dim)[permute_axis_order] # reorder pixel dimensions
+    vox_dim = np.array(vox_dim)[permute_axis_order] # Do the same to reorder pixel dimensions
 
+    for orientation in orientations_permute: # Flip axes as needed to get R/A/S as positive end of axis (into radiological view)
+        if (orientation[1] == 1 and orientation[0] == 0) or (orientation[1] == -1 and orientation[0] > 0):
+            img = nib.orientations.flip_axis(img, axis=orientation[0].astype('int'))
+    
     return img, vox_dim
 
 def _unique_prefixes(volume_prefixes):
