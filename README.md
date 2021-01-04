@@ -59,7 +59,7 @@
 
     git clone https://github.com/MASILab/PreQual.git
     cd /path/to/repo/PreQual
-    git checkout v1.0.3
+    git checkout v1.0.4
     sudo singularity build /path/to/prequal.simg Singularity
 
 We use Singularity version 3.4 with root permissions.
