@@ -51,7 +51,7 @@
 
 ## Authors and Reference
 
-[Leon Y. Cai](mailto:leon.y.cai@vanderbilt.edu), Qi Yang, Colin B. Hansen, Vishwesh Nath, Karthik Ramadass, Graham W. Johnson, Benjamin N. Conrad, Brian D. Boyd, John P. Begnoche, Lori L. Beason-Held, Andrea T. Shafer, Susan M. Resnick, Warren D. Taylor, Gavin R. Price, Victoria L. Morgan, Baxter P. Rogers, Kurt G. Schilling, Bennett A. Landman. *PreQual: An automated pipeline for integrated preprocessing and quality assurance of diffusion weighted MRI images*. [bioRxiv](https://www.biorxiv.org/content/10.1101/2020.09.14.260240v2), 2020. Preprint.
+[Leon Y. Cai](mailto:leon.y.cai@vanderbilt.edu), Qi Yang, Colin B. Hansen, Vishwesh Nath, Karthik Ramadass, Graham W. Johnson, Benjamin N. Conrad, Brian D. Boyd, John P. Begnoche, Lori L. Beason-Held, Andrea T. Shafer, Susan M. Resnick, Warren D. Taylor, Gavin R. Price, Victoria L. Morgan, Baxter P. Rogers, Kurt G. Schilling, Bennett A. Landman. *PreQual: An automated pipeline for integrated preprocessing and quality assurance of diffusion weighted MRI images*. [bioRxiv](https://www.biorxiv.org/content/10.1101/2020.09.14.260240v3), 2020. Preprint.
 
 [Medical-image Analysis and Statistical Interpretation (MASI) Lab](https://my.vanderbilt.edu/masi), Vanderbilt University, Nashville, TN, USA
 
@@ -306,7 +306,7 @@ Default = do NOT keep intermediates
 
 **--num\_threads N**
 
-A positive integer indicating the number of threads to use when running portions of the pipeline that can be multithreaded (i.e. MRTrix3, ANTs, and FSL’s eddy without GPU acceleration).
+A positive integer indicating the number of threads to use when running portions of the pipeline that can be multithreaded (i.e. MRTrix3, ANTs, and FSL’s eddy without GPU acceleration). Please note that at the time of writing, **FSL's topup cannot be parallelized**, and that the runtime of topup can increase dramatically as more b0 volumes are included.
 
 Note: Due to resource concerns, special permission needed to multi-thread on XNAT.
 
