@@ -16,7 +16,7 @@ from vars import SHARED_VARS
 
 # Define Preprocessing Functions
 
-def prep(dwi_files, bvals_files, bvecs_files, pe_axis, pe_dirs, readout_times, use_topup, use_synb0, t1_file, topup_dir, eddy_dir, eddy_bval_scale):
+def prep(dwi_files, bvals_files, bvecs_files, pe_axis, pe_dirs, readout_times, use_topup, use_synb0, t1_file, topup_dir, eddy_dir, eddy_bval_scale, topup_first_b0s_only):
 
     print('PREPARING FOR PREPROCESSING...')
 
@@ -35,7 +35,10 @@ def prep(dwi_files, bvals_files, bvecs_files, pe_axis, pe_dirs, readout_times, u
     num_vols = []
     for i in range(len(bvals_files)):
         bvals = utils.load_txt(bvals_files[i], txt_type='bvals')
-        num_b0s.append(np.sum(bvals == 0))
+        if topup_first_b0s_only: # if not using all b0s, use first b0 from each dwi file
+            num_b0s.append(1)
+        else: # if using all b0s, get an accurate count for each input dwi file 
+            num_b0s.append(np.sum(bvals == 0))
         num_vols.append(len(bvals))
 
     # Prepare for topup if applicable
@@ -46,11 +49,23 @@ def prep(dwi_files, bvals_files, bvecs_files, pe_axis, pe_dirs, readout_times, u
 
     if use_topup:
 
-        # Extract all b0s
+        # Extract b0s for topup
 
-        print('EXTRACTING ALL B0S FROM DWI INPUT FOR TOPUP')
+        if topup_first_b0s_only:
 
-        topup_input_b0s_file, _, _ = utils.dwi_extract(eddy_input_dwi_file, eddy_input_bvals_file, topup_dir, target_bval=0, first_only=False)
+            print('EXTRACTING FIRST B0 FROM EACH DWI INPUT FOR TOPUP')
+            temp_dir = utils.make_dir(topup_dir, 'TEMP')
+            topup_input_b0s_files = []
+            for i in range(len(dwi_files)):
+                b0_file, _, _ = utils.dwi_extract(dwi_files[i], bvals_files[i], temp_dir, target_bval=0, first_only=True)
+                topup_input_b0s_files.append(b0_file)
+            topup_input_b0s_file = utils.dwi_merge(topup_input_b0s_files, '{}_first_b0s_only'.format(eddy_input_prefix), topup_dir)
+            utils.remove_dir(temp_dir)
+
+        else:
+
+            print('EXTRACTING ALL B0S FROM DWI INPUT FOR TOPUP')
+            topup_input_b0s_file, _, _ = utils.dwi_extract(eddy_input_dwi_file, eddy_input_bvals_file, topup_dir, target_bval=0, first_only=False)
 
         # Run synb0 if needed
 

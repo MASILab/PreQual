@@ -35,6 +35,7 @@ def main():
     parser.add_argument('--rician', metavar='on/off', default='off', help='Perform Rician noise correction with method of moments (default = off)')
     parser.add_argument('--prenormalize', metavar='on/off', default='on', help='Normalize intensity distributions before preprocessing (default = on)')
     parser.add_argument('--synb0', metavar='on/off', default='on', help='Run topup with a synthetic b0 generated with Synb0-DisCo if no reverse phase encoded images are supplied and a T1 is supplied (default = on)')
+    parser.add_argument('--topup_first_b0s_only', action='store_true', help='Run topup with only the first b0 of each image when images have >1 b0 volume (default = run with ALL b0 volumes)')
     parser.add_argument('--extra_topup_args', metavar='string', default='', help='Extra arguments to pass to topup')
     parser.add_argument('--eddy_cuda', metavar='8.0/9.1/off', default='off', help='Run eddy with CUDA 8.0 or 9.1 or without GPU acceleration and with OPENMP only (default = off)')
     parser.add_argument('--eddy_mask', metavar='on/off', default='on', help='Use a brain mask for eddy (default = on)')
@@ -134,6 +135,8 @@ def main():
         params['use_synb0_user'] = False
     else:
         raise utils.DTIQAError('INVALID INPUT FOR --synb0 PARAMETER. EXITING.')
+
+    params['topup_first_b0s_only'] = args.topup_first_b0s_only
 
     params['extra_topup_args'] = args.extra_topup_args
     if len(params['extra_topup_args']) > 0:
@@ -246,6 +249,7 @@ def main():
     print('- Degibbs: {}'.format(params['use_degibbs']))
     print('- Rician: {}'.format(params['use_rician']))
     print('- Prenormalize: {}'.format(params['use_prenormalize']))
+    print('- Topup First b0s Only: {}'.format(params['topup_first_b0s_only']))
     print('- Extra Topup Args: {}'.format(params['extra_topup_args']))
     print('- Eddy CUDA: {}'.format(params['eddy_cuda_version']))
     print('- Eddy Mask Type: {}'.format(params['eddy_mask_type']))
@@ -457,7 +461,7 @@ def main():
     eddy_dir = utils.make_dir(out_dir, 'EDDY')
     
     topup_input_b0s_file, topup_acqparams_file, b0_d_file, b0_syn_file, eddy_input_dwi_file, eddy_input_bvals_file, eddy_input_bvecs_file, eddy_acqparams_file, eddy_index_file = \
-        preproc.prep(dwi_prenorm_files, bvals_checked_files, bvecs_checked_files, pe_axis, pe_dirs, readout_times, use_topup, use_synb0, t1_file, topup_dir, eddy_dir, params['eddy_bval_scale'])
+        preproc.prep(dwi_prenorm_files, bvals_checked_files, bvecs_checked_files, pe_axis, pe_dirs, readout_times, use_topup, use_synb0, t1_file, topup_dir, eddy_dir, params['eddy_bval_scale'], params['topup_first_b0s_only'])
 
     tf = time.time()
     dt = round(tf - ti)

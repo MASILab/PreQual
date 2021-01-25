@@ -47,6 +47,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
         '- Run Degibbs: {}\n'
         '- Run Rician: {}\n'
         '- Run Prenormalize: {}\n'
+        '- Topup B0s: {}\n'
         '- Try Synb0-DisCo: {}\n'
         '- Extra Topup Args: {}\n'
         '- Eddy Mask: {}\n'
@@ -64,6 +65,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
                 params['use_degibbs'],
                 params['use_rician'],
                 params['use_prenormalize'],
+                'First' if params['topup_first_b0s_only'] else 'All',
                 params['use_synb0_user'],
                 params['extra_topup_args'],
                 True if params['eddy_mask_type'] == 'brain' else False,
