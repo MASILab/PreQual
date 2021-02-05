@@ -51,7 +51,7 @@
 
 ## Authors and Reference
 
-[Leon Y. Cai](mailto:leon.y.cai@vanderbilt.edu), Qi Yang, Colin B. Hansen, Vishwesh Nath, Karthik Ramadass, Graham W. Johnson, Benjamin N. Conrad, Brian D. Boyd, John P. Begnoche, Lori L. Beason-Held, Andrea T. Shafer, Susan M. Resnick, Warren D. Taylor, Gavin R. Price, Victoria L. Morgan, Baxter P. Rogers, Kurt G. Schilling, Bennett A. Landman. *PreQual: An automated pipeline for integrated preprocessing and quality assurance of diffusion weighted MRI images*. [bioRxiv](https://www.biorxiv.org/content/10.1101/2020.09.14.260240v3), 2020. Preprint.
+[Leon Y. Cai](mailto:leon.y.cai@vanderbilt.edu), Qi Yang, Colin B. Hansen, Vishwesh Nath, Karthik Ramadass, Graham W. Johnson, Benjamin N. Conrad, Brian D. Boyd, John P. Begnoche, Lori L. Beason-Held, Andrea T. Shafer, Susan M. Resnick, Warren D. Taylor, Gavin R. Price, Victoria L. Morgan, Baxter P. Rogers, Kurt G. Schilling, Bennett A. Landman. *PreQual: An automated pipeline for integrated preprocessing and quality assurance of diffusion weighted MRI images*. [Magnetic Resonance in Medicine](https://onlinelibrary.wiley.com/doi/full/10.1002/mrm.28678), 2021.
 
 [Medical-image Analysis and Statistical Interpretation (MASI) Lab](https://my.vanderbilt.edu/masi), Vanderbilt University, Nashville, TN, USA
 
@@ -59,7 +59,7 @@
 
     git clone https://github.com/MASILab/PreQual.git
     cd /path/to/repo/PreQual
-    git checkout v1.0.4
+    git checkout v1.0.5
     sudo singularity build /path/to/prequal.simg Singularity
 
 We use Singularity version 3.4 with root permissions.
@@ -199,6 +199,12 @@ Run `topup` with a synthetic b0 generated with the Synb0-DisCo deep-learning fra
 
 Default = on
 
+**--topup\_first\_b0s\_only**
+
+Run `topup` with only the first b0 from each input image. At the time of writing, **FSL's topup cannot be parallelized**, and the runtime of topup can increase dramatically as more b0 volumes are included. This flag allows for faster processing at the expense of information lost from any interleaved b0s.
+
+Default = use ALL b0s
+
 **--extra\_topup\_args="string”**
 
 Extra arguments to pass to FSL’s `topup`. `Topup` will run with the following by default (as listed in the `/SUPPLEMENTAL/topup.cnf` configuration file) but will be overwritten by arguments passed to `--extra_topup_args`:
@@ -306,7 +312,7 @@ Default = do NOT keep intermediates
 
 **--num\_threads N**
 
-A positive integer indicating the number of threads to use when running portions of the pipeline that can be multithreaded (i.e. MRTrix3, ANTs, and FSL’s eddy without GPU acceleration). Please note that at the time of writing, **FSL's topup cannot be parallelized**, and that the runtime of topup can increase dramatically as more b0 volumes are included.
+A positive integer indicating the number of threads to use when running portions of the pipeline that can be multithreaded (i.e. MRTrix3, ANTs, and FSL’s eddy without GPU acceleration). Please note that at the time of writing, **FSL's topup cannot be parallelized**, and that the runtime of topup can increase dramatically as more b0 volumes are included. See `--topup_first_b0s_only` for more information.
 
 Note: Due to resource concerns, special permission needed to multi-thread on XNAT.
 

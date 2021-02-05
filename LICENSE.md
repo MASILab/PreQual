@@ -52,7 +52,7 @@ PART B. DOWNLOADING AGREEMENT - License from Vanderbilt with Right to Sublicense
 
 9. Any publications that make use of the Software should include an acknowledgement to Vanderbilt University and the software developers using the citation below:
 
-   **Leon Y. Cai, Qi Yang, Colin B. Hansen, Vishwesh Nath, Karthik Ramadass, Graham W. Johnson, Benjamin N. Conrad, Brian D. Boyd, John P. Begnoche, Lori L. Beason-Held, Andrea T. Shafer, Susan M. Resnick, Warren D. Taylor, Gavin R. Price, Victoria L. Morgan, Baxter P. Rogers, Kurt G. Schilling, Bennett A. Landman. *PreQual: An automated pipeline for integrated preprocessing and quality assurance of diffusion weighted MRI images*. bioRxiv, 2020. Preprint.**
+   **Leon Y. Cai, Qi Yang, Colin B. Hansen, Vishwesh Nath, Karthik Ramadass, Graham W. Johnson, Benjamin N. Conrad, Brian D. Boyd, John P. Begnoche, Lori L. Beason-Held, Andrea T. Shafer, Susan M. Resnick, Warren D. Taylor, Gavin R. Price, Victoria L. Morgan, Baxter P. Rogers, Kurt G. Schilling, Bennett A. Landman. *PreQual: An automated pipeline for integrated preprocessing and quality assurance of diffusion weighted MRI images*. Magnetic Resonance in Medicine, 2021.**
 
 10. For commercial use rights, contact the Vanderbilt University Center for Technology Transfer and Commercialization at cttc@vanderbilt.edu or call 615-343-2430 and inquire about the Program.
 
