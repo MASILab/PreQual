@@ -4,12 +4,13 @@
 
 * [Overview](#overview)
 * [Authors and Reference](#authors-and-reference)
+* [Getting Started](#getting-started)
 * [Containerization of Source Code](#containerization-of-source-code)
 * [Command](#command)
 * [Arguments and I/O](#arguments-and-io)
 * [Configuration File](#configuration-file)
-* [Example Phase Encoding Schemes](#example-phase-encoding-schemes)
-* [Quick Start](#quick-start)
+* [Examples](#examples)
+* [Running BIDS Data](#running-bids-data)
 * [Options](#options)
 * [Pipeline Assumptions](#pipeline-assumptions)
 * [Pipeline Processing Steps](#pipeline-processing-steps)
@@ -54,6 +55,12 @@
 [Leon Y. Cai](mailto:leon.y.cai@vanderbilt.edu), Qi Yang, Colin B. Hansen, Vishwesh Nath, Karthik Ramadass, Graham W. Johnson, Benjamin N. Conrad, Brian D. Boyd, John P. Begnoche, Lori L. Beason-Held, Andrea T. Shafer, Susan M. Resnick, Warren D. Taylor, Gavin R. Price, Victoria L. Morgan, Baxter P. Rogers, Kurt G. Schilling, Bennett A. Landman. *PreQual: An automated pipeline for integrated preprocessing and quality assurance of diffusion weighted MRI images*. [Magnetic Resonance in Medicine](https://onlinelibrary.wiley.com/doi/full/10.1002/mrm.28678), 2021.
 
 [Medical-image Analysis and Statistical Interpretation (MASI) Lab](https://my.vanderbilt.edu/masi), Vanderbilt University, Nashville, TN, USA
+
+## Getting Started
+
+The PreQual software is designed to run inside a [Singularity container](#containerization-of-source-code). The container requires an "[inputs](#arguments-and-io)" folder that holds all required input diffusion image files (i.e., .nii.gz, .bval, and .bvec files) and a [configuration file](#configuration-file). For those running Synb0-DisCo to correct susceptibility distortions without reverse phase-encoded images, this folder will also contain the [structural T1 image](#arguments-and-io). The container also requires an "[outputs](#arguments-and-io)" folder that will hold all the outputs after the pipeline runs. We also need to know the image *[axis](#arguments-and-io)* on which phase encoding was performed for all inputs (i.e., "i" for the first dimension, "j" for the second). To build the configuration file, we need to know the *[direction](#configuration-file)* along said axis in which each image was phase encoded (i.e., "+" for positive direction and "-" for the negative direction) and the [readout time](#configuration-file) for each input image. Once we have this information, we bind the inputs and outputs directories into the container to [run the pipeline](#command).
+
+Note: The phase encoding axis, direction, and readout time must be known ahead of time, as this information is not stored in NIFTI headers. Depending on the scanner used, they may be available in JSON sidecars when NIFTIs are converted from DICOMs with [dcm2niix](#pipeline-assumptions).
 
 ## Containerization of Source Code
 
@@ -118,7 +125,7 @@ We use Singularity version 3.4 with root permissions.
 
     * PDF/dtiQA.pdf
 
-* **pe\_axis:** Phase encoding axis of all the input images. We do NOT support different phase encoding axes between different input images at this time. The options are i and j and correspond to the first and second dimension of the input images, respectively. Note that FSL does not currently support phase encoding in the third dimension (i.e. k, the dimension in which the image slices were acquired, commonly axial for RAS and LAS oriented images). This parameter is direction AGNOSTIC. The phase encoding directions of the input images along this axis are specified in the dtiQA\_config.csv file. See "dtiQA\_config.csv Format" and “Example Phase Encoding Schemes” for more information.
+* **pe\_axis:** Phase encoding axis of all the input images. We do NOT support different phase encoding axes between different input images at this time. The options are i and j and correspond to the first and second dimension of the input images, respectively. Note that FSL does not currently support phase encoding in the third dimension (i.e. k, the dimension in which the image slices were acquired, commonly axial for RAS and LAS oriented images). **This parameter is direction AGNOSTIC**. The phase encoding directions of the input images along this axis are specified in the dtiQA\_config.csv file. See [Configuration File](#configuration-file) and [Examples](#examples) for more information.
 
 ## Configuration File
 
@@ -134,9 +141,9 @@ The format for the lines of the configuration CSV file, dtiQA\_config.csv (must 
 
   * Note that a combination of phase encoding axis and direction map to specific anatomical (i.e. APA, APP, etc.) directions based on the orientation of the image. So, for instance in a RAS image, an axis of j and direction of + map to APP. We infer the orientation of the image from the header of the NIFTI using nibabel tools and output the best anatomical phase encoding direction interpretation of the input direction in the PDF.
 
-* **readout\_time** is a non-negative number, the readout\_time parameter required by FSL’s eddy. The absolute value of this parameter is used to scale the estimated b0 field. Note a value of 0 indicates that the images are infinite bandwidth (i.e. no susceptibility distortion). See "Example Phase Encoding Schemes" below for more information.
+* **readout\_time** is a non-negative number, the readout\_time parameter required by FSL’s eddy. The absolute value of this parameter is used to scale the estimated b0 field. Note a value of 0 indicates that the images are infinite bandwidth (i.e. no susceptibility distortion). See [Examples](#examples) for more information.
 
-## Example Phase Encoding Schemes
+## Examples
 
 Here are some different example combinations of pe\_axis, pe\_dir, and readout\_time parameters and the corresponding FSL acquisition parameters lines:
 
@@ -145,8 +152,6 @@ pe\_axis | pe\_dir | readout\_time | acqparams line
 i | + |	0.05 | 1, 0, 0, 0.05
 j | - | 0.1 | 0, -1, 0, 0.1
 
-## Quick Start
-
 These are examples of common use cases. They also all share the same command, as detailed above. The PREPROCESSED output folder will contain the final outputs and the PDF folder will contain the QA report.
 
 Phase Encoding<br>Axis | Reverse Phase<br>Encoded (RPE) Image | T1<br>Image | Contents of<br>Input Directory | Contents of<br>dtiQA_config.csv
@@ -154,6 +159,23 @@ Phase Encoding<br>Axis | Reverse Phase<br>Encoded (RPE) Image | T1<br>Image | Co
 j | Yes | N/A |	dti1.nii.gz<br>dti1.bval<br>dti1.bvec<br>dti2.nii.gz<br>dti2.bval<br>dti2.bvec<br>rpe.nii.gz<br>rpe.bval<br>rpe.bvec<br>dtiQA_config.csv  | dti1,+,0.05<br>dti2,+,0.05<br>rpe,-,0.05
 j | No | Yes |	dti1.nii.gz<br>dti1.bval<br>dti1.bvec<br>dti2.nii.gz<br>dti2.bval<br>dti2.bvec<br>t1.nii.gz<br>dtiQA_config.csv  | dti1,+,0.05<br>dti2,+,0.05
 j | No | No | dti1.nii.gz<br>dti1.bval<br>dti1.bvec<br>dti2.nii.gz<br>dti2.bval<br>dti2.bvec<br>dtiQA_config.csv | dti1,+,0.05<br>dti2,+,0.05
+
+## Running BIDS Data
+
+While not a BIDS pipeline, data in BIDS format can be run with PreQual without moving or copying data. The key is that the input directory structure must be as described relative to *inside the container*. By creatively binding files/folders into the container, we can achieve the same effect:
+
+    -B /path/to/sub-X/ses-X/dwi/:/INPUTS
+    -B /path/to/sub-X/ses-X/anat/sub-X_ses-X_T1w.nii.gz:/INPUTS/t1.nii.gz (optional, Synb0-DisCo only)
+    -B /path/to/config/file.csv:/INPUTS/dtiQA_config.csv
+    -B /path/to/outputs/directory/:/OUTPUTS
+    -B /tmp:/tmp
+    -B /path/to/freesurfer/license.txt:/APPS/freesurfer/license.txt
+
+The outputs directory and configuration file can be created wherever makes the most sense for the user. The contents of the configuration file will look something like this:
+
+    sub-X_ses-X_acq-1_dwi,pe_dir,readout_time
+    :
+    sub-X_ses-X_acq-N_dwi,pe_dir,readout_time
 
 ## Options
 
