@@ -135,11 +135,11 @@ The format for the lines of the configuration CSV file, dtiQA\_config.csv (must 
     :
     <imageN>,pe_dir,readout_time
 
-* **\<image\>** is the shared file PREFIX between the corresponding NIFTI, BVAL, and BVEC files for that particular image (i.e. HARDI\_iso.nii.gz -\> HARDI\_iso)
+* **\<image\>** is the shared file PREFIX between the corresponding NIFTI, BVAL, and BVEC files for that particular image in the input directory (i.e., my\_dwi.nii.gz/.bval/.bvec -\> my\_dwi). Do NOT include the path to the input directory.
 
 * **pe\_dir** is either + or -, corresponding to the direction along the phase encoding axis (as defined by the parameter `pe_axis`) on which the image is phase encoded.
 
-  * Note that a combination of phase encoding axis and direction map to specific anatomical (i.e. APA, APP, etc.) directions based on the orientation of the image. So, for instance in a RAS image, an axis of j and direction of + map to APP. We infer the orientation of the image from the header of the NIFTI using nibabel tools and output the best anatomical phase encoding direction interpretation of the input direction in the PDF.
+  * Note that a combination of phase encoding axis and direction map to specific anatomical (i.e. APA, APP, etc.) directions based on the orientation of the image. So, for instance in a RAS image, an axis of j and direction of + map to APP. We infer the orientation of the image from the header of the NIFTI using nibabel tools and output the best anatomical phase encoding direction interpretation of the input direction in the PDF for QA.
 
 * **readout\_time** is a non-negative number, the readout\_time parameter required by FSL’s eddy. The absolute value of this parameter is used to scale the estimated b0 field. Note a value of 0 indicates that the images are infinite bandwidth (i.e. no susceptibility distortion). See [Examples](#examples) for more information.
 
