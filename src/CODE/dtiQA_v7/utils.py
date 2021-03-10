@@ -187,10 +187,16 @@ def dwi_check(dwi_file, bvals_file, bvecs_file, check_dir):
     print('CHECKING BVAL/BVECS FOR {}...'.format(dwi_prefix))
 
     # Load data and calculate bvec magnitudes
-
+    
+    dwi_img, dwi_aff, _ = load_nii(dwi_file, ndim=4)
     bvals = load_txt(bvals_file, txt_type='bvals')
     bvecs = load_txt(bvecs_file, txt_type='bvecs')
     bvec_mags = np.sqrt(np.sum(np.square(bvecs), 0))
+    
+    # Check that the number of bvecs, bvals, and volumes are all the same
+
+    if (not dwi_img.shape[3] == len(bvec_mags)) or (not dwi_img.shape[3] == len(bvals)) or (not len(bvals) == len(bvec_mags)):
+        raise DTIQAError('INPUT {} HAS AN INCONSISTENT NUMBER OF BVALS, BVECS, AND/OR VOLUMES. PLEASE CHECK INPUTS.'.format(dwi_prefix))
 
     # Find unsupported bvec/bval combos
 
@@ -209,7 +215,6 @@ def dwi_check(dwi_file, bvals_file, bvecs_file, check_dir):
     # Remove those volumes and save
     
     dwi_checked_file = os.path.join(check_dir, '{}_checked.nii.gz'.format(dwi_prefix))
-    dwi_img, dwi_aff, _ = load_nii(dwi_file, ndim=4)
     if dwi_img.shape[3] == 1:
         if keep_vols:
             dwi_checked_img = dwi_img
