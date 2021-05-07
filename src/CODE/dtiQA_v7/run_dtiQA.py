@@ -36,11 +36,11 @@ def main():
     parser.add_argument('--prenormalize', metavar='on/off', default='on', help='Normalize intensity distributions before preprocessing (default = on)')
     parser.add_argument('--synb0', metavar='on/off', default='on', help='Run topup with a synthetic b0 generated with Synb0-DisCo if no reverse phase encoded images are supplied and a T1 is supplied (default = on)')
     parser.add_argument('--topup_first_b0s_only', action='store_true', help='Run topup with only the first b0 of each image when images have >1 b0 volume (default = run with ALL b0 volumes)')
-    parser.add_argument('--extra_topup_args', metavar='string', default='', help='Extra arguments to pass to topup')
+    parser.add_argument('--extra_topup_args', metavar='string', default='', help='Extra arguments to pass to topup as a list separated by +\'s with no spaces (i.e., --extra_topup_args=--scale=1+--regrid=0)')
     parser.add_argument('--eddy_cuda', metavar='8.0/9.1/off', default='off', help='Run eddy with CUDA 8.0 or 9.1 or without GPU acceleration and with OPENMP only (default = off)')
     parser.add_argument('--eddy_mask', metavar='on/off', default='on', help='Use a brain mask for eddy (default = on)')
     parser.add_argument('--eddy_bval_scale', metavar='N/off', default='off', help='Positive number with which to scale b-values for eddy only in order to perform distortion correction on super low shells (default = off)')
-    parser.add_argument('--extra_eddy_args', metavar='string', default='', help='Extra arguments to pass to eddy')
+    parser.add_argument('--extra_eddy_args', metavar='string', default='', help='Extra arguments to pass to eddy as a list separated by +\'s with no spaces (i.e., --extra_eddy_args=--data_is_shelled+--ol_nstd=1)')
     parser.add_argument('--postnormalize', metavar='on/off', default='off', help='Normalize intensity distributions after preprocessing (deprecated, default = off)')
     parser.add_argument('--correct_bias', metavar='on/off', default='off', help='Perform N4 bias field correction as implemented in ANTS (default = off)')
     parser.add_argument('--glyph_type', metavar='tensor/vector', default='tensor', help='In the QA document, visualize the tensor model either as glyphs of the full tensors or as glyphs of the principal eigenvector (default = tensor)')
@@ -138,7 +138,7 @@ def main():
 
     params['topup_first_b0s_only'] = args.topup_first_b0s_only
 
-    params['extra_topup_args'] = args.extra_topup_args
+    params['extra_topup_args'] = args.extra_topup_args.replace('+', ' ')
     if len(params['extra_topup_args']) > 0:
         warning_strs.append('Additional inputs given to topup. These are untested and may produce pipeline failure or inaccurate results.')
 
@@ -167,7 +167,7 @@ def main():
     else:
         raise utils.DTIQAError('INVALID INPUT FOR --eddy_bval_scale PARAMETER. EXITING.')
 
-    params['extra_eddy_args'] = args.extra_eddy_args
+    params['extra_eddy_args'] = args.extra_eddy_args.replace('+', ' ')
     if len(params['extra_eddy_args']) > 0:
         warning_strs.append('Additional inputs given to eddy. These are untested and may produce pipeline failure or inaccurate results.')
 
