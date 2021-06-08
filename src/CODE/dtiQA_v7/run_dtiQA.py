@@ -43,6 +43,7 @@ def main():
     parser.add_argument('--extra_eddy_args', metavar='string', default='', help='Extra arguments to pass to eddy as a list separated by +\'s with no spaces (i.e., --extra_eddy_args=--data_is_shelled+--ol_nstd=1)')
     parser.add_argument('--postnormalize', metavar='on/off', default='off', help='Normalize intensity distributions after preprocessing (deprecated, default = off)')
     parser.add_argument('--correct_bias', metavar='on/off', default='off', help='Perform N4 bias field correction as implemented in ANTS (default = off)')
+    parser.add_argument('--improbable_mask', metavar='on/off', default='off', help='Create an additional mask on the preprocessed data that omits voxels where the minimum b0 signal is smaller than the minimum diffusion weighted signal (default = on)')
     parser.add_argument('--glyph_type', metavar='tensor/vector', default='tensor', help='In the QA document, visualize the tensor model either as glyphs of the full tensors or as glyphs of the principal eigenvector (default = tensor)')
     parser.add_argument('--atlas_reg_type', metavar='FA/b0', default='FA', help='Register to the JHU atlas by using the subject FA map or the subject average preprocessed b0 (default = FA)')
     parser.add_argument('--split_outputs', action='store_true', help='Split preprocessed output to match structure of input files (default = do NOT split)')
@@ -185,6 +186,13 @@ def main():
     else:
         raise utils.DTIQAError('INVALID INPUT FOR --correct_bias PARAMETER. EXITING.')
 
+    if args.improbable_mask == 'on':
+        params['improbable_mask'] = True
+    elif args.improbable_mask == 'off':
+        params['improbable_mask'] = False
+    else:
+        raise utils.DTIQAError('INVALID INPUT FOR --improbable_mask PARAMETER. EXITING.')
+
     if args.glyph_type == 'tensor' or args.glyph_type == 'vector':
         params['glyph_type'] = args.glyph_type
     else:
@@ -257,7 +265,8 @@ def main():
     print('- Extra Eddy Args: {}'.format(params['extra_eddy_args']))
     print('- Postnormalize: {}'.format(params['use_postnormalize']))
     print('- N4 Bias Correction: {}'.format(params['use_unbias']))
-    print('- Glyph Visulization: {}'.format(params['glyph_type']))
+    print('- Improbable Mask: {}'.format(params['improbable_mask']))
+    print('- Glyph Visualization: {}'.format(params['glyph_type']))
     print('- Atlas Registration: {}'.format(params['atlas_reg_type']))
     print('- Split Outputs: {}'.format(params['split_outputs']))
     print('- Keep Intermediates: {}'.format(params['keep_intermediates']))
@@ -633,8 +642,12 @@ def main():
     ti = time.time()
 
     mask_file = preproc.mask(dwi_preproc_file, bvals_preproc_file, 'brain', preproc_dir)
-
     mask_file = utils.rename_file(mask_file, os.path.join(preproc_dir, 'mask.nii.gz')) # Name it mask.nii.gz in the PREPROCESSED directory
+
+    improbable_mask_file, percent_improbable = utils.dwi_improbable_mask(mask_file, dwi_preproc_file, bvals_preproc_file, preproc_dir)
+
+    if not params['improbable_mask']:
+        utils.remove_file(improbable_mask_file)
 
     tf = time.time()
     dt = round(tf - ti)
@@ -744,7 +757,7 @@ def main():
     prenorm_vis_file = utils.rename_file(prenorm_vis_file, os.path.join(vis_dir, 'prenorm.pdf'))
     if params['use_postnormalize']:
         norm_vis_file = vis.vis_norm(dwi_eddy_files, dwi_norm_files, dwi_norm_gains, dwi_norm_bins, dwi_eddy_hists, dwi_normed_hists, 'Postnormalization', vis_dir)
-    preproc_vis_file = vis.vis_preproc(dwi_checked_files, bvals_checked_files, dwi_preproc_file, bvals_preproc_file, eddy_mask_file, mask_file, chisq_mask_file, vis_dir)
+    preproc_vis_file = vis.vis_preproc(dwi_checked_files, bvals_checked_files, dwi_preproc_file, bvals_preproc_file, eddy_mask_file, mask_file, percent_improbable, chisq_mask_file, vis_dir)
     stats_vis_file = vis.vis_stats(dwi_preproc_file, bvals_preproc_file, mask_file, chisq_matrix_file, motion_dict, eddy_dir, vis_dir)
     gradcheck_vis_file = vis.vis_gradcheck(bvals_checked_files, bvecs_checked_files, bvals_preproc_file, bvecs_preproc_file, bvals_corrected_file, bvecs_corrected_file, vis_dir)
     if params['use_unbias']:

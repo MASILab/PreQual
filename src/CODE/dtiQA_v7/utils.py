@@ -614,6 +614,37 @@ def dwi_mask(dwi_file, mask_dir):
 
     return mask_file
 
+def dwi_improbable_mask(mask_file, dwi_file, bvals_file, mask_dir):
+
+    mask_prefix = get_prefix(mask_file)
+
+    print('IDENTIFYING VOXELS FOR IMPROBABLE MASK, BUILDING ON EXISTING MASK {}'.format(mask_prefix))
+
+    # Load mask, DWI, and b-values 
+
+    mask_img, mask_aff, _ = load_nii(mask_file, dtype='bool', ndim=3)
+    dwi_img, _, _ = load_nii(dwi_file, ndim=4)
+    bvals = load_txt(bvals_file, txt_type='bvals')
+
+    # Keep voxels where the minimum value across b0s is greater than the minimum value across dwis
+    # and its in the original mask
+
+    b0_min_img = np.amin(dwi_img[:, :, :, bvals == 0], axis=3)
+    dwi_min_img = np.amin(dwi_img[:, :, :, bvals != 0], axis=3)
+    improbable_mask_img = np.logical_and(b0_min_img > dwi_min_img, mask_img)
+
+    # Compute Percent of intra-mask voxels that are improbable
+
+    percent_improbable = 100 * (1 - np.sum(improbable_mask_img)/np.sum(mask_img))
+    print('WITHIN MASK {}, {:.2f}% OF VOXELS WERE IMPROBABLE'.format(mask_prefix, percent_improbable))
+
+    # Save improbable mask
+
+    improbable_mask_file = os.path.join(mask_dir, '{}_improbable.nii.gz'.format(mask_prefix))
+    save_nii(improbable_mask_img.astype(int), mask_aff, improbable_mask_file, ndim=3)
+
+    return improbable_mask_file, percent_improbable
+
 def dwi_smooth(dwi_file, smooth_dir):
 
     dwi_prefix = get_prefix(dwi_file)

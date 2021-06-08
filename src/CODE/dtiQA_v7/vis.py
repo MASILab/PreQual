@@ -55,6 +55,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
         '- Extra Eddy Args: {}\n'
         '- Run Postnormalize: {}\n'
         '- Run N4 Bias Field Correction: {}\n'
+        '- Mask Improbable Voxels: {}\n'
         '- Glyph Visualization Type: {}\n'
         '- Atlas Registration Type: {}\n'
         '- Split Outputs: {}\n'
@@ -73,6 +74,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
                 params['extra_eddy_args'],
                 params['use_postnormalize'],
                 params['use_unbias'],
+                params['improbable_mask'],
                 params['glyph_type'],
                 params['atlas_reg_type'],
                 params['split_outputs'],
@@ -241,7 +243,7 @@ def vis_synb0(b0_d_file, t1_file, b0_syn_file, vis_dir):
 
     return synb0_vis_file
 
-def vis_preproc(dwi_files, bvals_files, dwi_preproc_file, bvals_preproc_file, eddy_mask_file, mask_file, stats_mask_file, vis_dir):
+def vis_preproc(dwi_files, bvals_files, dwi_preproc_file, bvals_preproc_file, eddy_mask_file, mask_file, percent_improbable, stats_mask_file, vis_dir):
 
     print('VISUALIZING RAW AND PREPROCESSED DATA + MASKS')
 
@@ -319,7 +321,7 @@ def vis_preproc(dwi_files, bvals_files, dwi_preproc_file, bvals_preproc_file, ed
 
     legend_ax = plt.subplot(5, 2, 8)
     plt.plot([], linewidth=2, color='r', label='Eddy Mask')
-    plt.plot([], linewidth=2, color='c', label='Preprocessed Mask')
+    plt.plot([], linewidth=2, color='c', label='Preprocessed Mask ({:.2f}% Voxels Improbable)'.format(percent_improbable))
     plt.plot([], linewidth=2, color='m', label=r'$\chi^2$' ' Mask')
     plt.legend(bbox_to_anchor=(0.5, 0.5), loc='center', ncol=1)
     legend_ax.axis('off')
