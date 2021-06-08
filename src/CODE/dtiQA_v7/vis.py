@@ -496,7 +496,7 @@ def vis_degibbs(dwi_files, bvals_files, dwi_degibbs_files, gains, vis_dir):
     # Plot 5 central triplanar views
 
     res_slices, res_vox_dim, res_min, res_max = utils.slice_nii(res_file, offsets=[-10, -5, 0, 5, 10], min_intensity=0, max_percentile=99)
-    temp_vis_file = _vis_vol(res_slices, res_vox_dim, res_min, res_max, temp_dir, name='Gibbs_Deringing:_Averaged_Residuals_of_b_=_0_Volumes', comment='Residuals should be larger at high-contrast interfaces', colorbar=False)
+    temp_vis_file = _vis_vol(res_slices, res_vox_dim, res_min, res_max, temp_dir, name='Gibbs_Deringing,_Averaged_Residuals_of_b_=_0_Volumes', comment='Residuals should be larger at high-contrast interfaces', colorbar=False)
     degibbs_vis_file = utils.rename_file(temp_vis_file, os.path.join(vis_dir, 'degibbs.pdf'))
 
     # Finish Up
