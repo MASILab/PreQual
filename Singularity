@@ -2,6 +2,7 @@ Bootstrap: docker
 From: ubuntu:18.04
 
 %post -c /bin/bash
+
     cd /
 
     # Prepare directories for installing applications
@@ -84,7 +85,7 @@ From: ubuntu:18.04
     cd /INSTALLERS
     git clone https://github.com/MASILab/PreQual.git
     cd PreQual
-    git checkout v1.0.5
+    git checkout v1.0.6
     mv src/APPS/* /APPS
     mv src/CODE/* /CODE
     mv src/SUPPLEMENTAL/* /SUPPLEMENTAL
@@ -106,21 +107,33 @@ From: ubuntu:18.04
     rm -r /INSTALLERS
 
 %environment
+
     # MRTrix3
     export PATH="/APPS/mrtrix3/bin:$PATH"
+
     # FSL
     FSLDIR=/APPS/fsl
     . ${FSLDIR}/etc/fslconf/fsl.sh
     PATH=${FSLDIR}/bin:${PATH}
     export FSLDIR PATH
+
     # Convert3D
     export PATH="/APPS/c3d-1.0.0-Linux-x86_64/bin:$PATH"
+
     # ANTs
     export ANTSPATH=/APPS/ants/bin/
     export PATH=${ANTSPATH}:$PATH
+
     # FreeSurfer
     export FREESURFER_HOME=/APPS/freesurfer
     #source $FREESURFER_HOME/SetUpFreeSurfer.sh # For us, only synb0 needs it so will put in that script.
 
+    # CUDA
+    export CPATH="/usr/local/cuda/include:$CPATH"
+    export PATH="/usr/local/cuda/bin:$PATH"
+    export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
+    export CUDA_HOME="/usr/local/cuda"
+
 %runscript
+
     xvfb-run -a --server-num=$((65536+$$)) --server-args="-screen 0 1600x1280x24 -ac" bash /CODE/run_dtiQA.sh /INPUTS /OUTPUTS "$@"

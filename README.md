@@ -66,7 +66,7 @@ Note: The phase encoding axis, direction, and readout time must be known ahead o
 
     git clone https://github.com/MASILab/PreQual.git
     cd /path/to/repo/PreQual
-    git checkout v1.0.5
+    git checkout v1.0.6
     sudo singularity build /path/to/prequal.simg Singularity
 
 We use Singularity version 3.4 with root permissions.
@@ -80,6 +80,7 @@ We use Singularity version 3.4 with root permissions.
     -B /path/to/outputs/directory/:/OUTPUTS
     -B /tmp:/tmp
     -B /path/to/freesurfer/license.txt:/APPS/freesurfer/license.txt
+    -B /path/to/cuda:/usr/local/cuda
     --nv
     /path/to/prequal.simg
     pe_axis
@@ -87,7 +88,7 @@ We use Singularity version 3.4 with root permissions.
     
 * Binding the freesurfer license is optional and only needed for Synb0-DisCo
 * Binding the tmp directory is necessary when running the image with `--contain`.
-* `--nv` is optional. See options `--eddy_cuda` and `--eddy_extra_args`. **GPU support is currently experimental.**
+* `--nv` and `-B /path/to/cuda:/usr/local/cuda` are optional. See options `--eddy_cuda` and `--eddy_extra_args`. **GPU support is currently experimental.**
 
 ## Arguments and I/O
 
@@ -227,7 +228,7 @@ Run `topup` with only the first b0 from each input image. At the time of writing
 
 Default = use ALL b0s
 
-**--extra\_topup\_args="string”**
+**--extra\_topup\_args=string**
 
 Extra arguments to pass to FSL’s `topup`. `Topup` will run with the following by default (as listed in the `/SUPPLEMENTAL/topup.cnf` configuration file) but will be overwritten by arguments passed to `--extra_topup_args`:
 
@@ -258,13 +259,13 @@ Extra arguments to pass to FSL’s `topup`. `Topup` will run with the following 
     # If set to 1 the images are individually scaled to a common mean intensity 
     --scale=0
 
-For `topup` options that require additional inputs, place the file in the inputs directory and use the following syntax: `--<myinputoption> /INPUTS/<file.ext>`. For `topup` options that produce additional outputs, the file will save in the output directory under the “TOPUP” folder by using the following syntax: `--<myoutputoption> /OUTPUTS/TOPUP/<file.ext>`. Note that in this case `/INPUTS` and `/OUTPUTS` should be named exactly as is and are NOT the path to the input and output directory on your file system.
+These parameters should be formatted as a list separated by +'s with no spaces (i.e., `--extra_topup_args=--scale=1+--regrid=0`). For `topup` options that require additional inputs, place the file in the inputs directory and use the following syntax: `--<myinputoption>=/INPUTS/<file.ext>`. For `topup` options that produce additional outputs, the file will save in the output directory under the “TOPUP” folder by using the following syntax: `--<myoutputoption>=/OUTPUTS/TOPUP/<file.ext>`. Note that in this case `/INPUTS` and `/OUTPUTS` should be named exactly as is and are NOT the path to the input and output directory on your file system.
 
 Default = none
 
 **--eddy\_cuda 8.0/9.1/off**
 
-Run FSL’s `eddy` with NVIDIA GPU acceleration. If this parameter is 8.0 or 9.1, either CUDA 8.0 or 9.1 must be installed and properly configured on your system, respectively, and the `--nv` flag must be run in the singularity command. If this parameter is off, `eddy` is run with OPENMP CPU multithreading. See `--num_threads` for more information. CUDA is required to run `eddy` with `--mporder` (intra-volume slice-wise motion correction). See `--extra_eddy_args` for more information.
+Run FSL’s `eddy` with NVIDIA GPU acceleration. If this parameter is 8.0 or 9.1, either CUDA 8.0 or 9.1 must be installed, properly configured on your system, and bound into the container, respectively. Additionally the `--nv` flag must be run in the singularity command. If this parameter is off, `eddy` is run with OPENMP CPU multithreading. See `--num_threads` for more information. CUDA is required to run `eddy` with `--mporder` (intra-volume slice-wise motion correction). See `--extra_eddy_args` for more information.
 
 Default = off
 
@@ -280,7 +281,7 @@ Run `eddy` with b-values scaled by the positive number N. All other steps of the
 
 Default = off
 
-**--extra\_eddy\_args="string”**
+**--extra\_eddy\_args=string**
 
 Extra arguments to pass to FSL’s `eddy`. `Eddy` will always run with the following:
 
@@ -288,7 +289,7 @@ Extra arguments to pass to FSL’s `eddy`. `Eddy` will always run with the follo
 
 Note that if `--mporder` is passed here, `--eddy_cuda` must be 8.0 or 9.1 and the singularity option `--nv` must be passed into the container, as intra-volume slice-wise motion correction requires GPU acceleration. 
 
-For `eddy` options that require additional inputs, place the file in the inputs directory and use the following syntax: `--<myinputoption> /INPUTS/<file.ext>`. For `eddy` options that produce additional outputs, the file will save in the output directory under the “EDDY” folder by using the following syntax: `--<myoutputoption> /OUTPUTS/EDDY/<file.ext>`. Note that in this case `/INPUTS` and `/OUTPUTS` should be named exactly as is and are NOT the path to the input and output directory on your file system.
+These parameters should be formatted as a list separated by +'s with no spaces (i.e., `--extra_eddy_args=--data_is_shelled+--ol_nstd=1`). For `eddy` options that require additional inputs, place the file in the inputs directory and use the following syntax: `--<myinputoption>=/INPUTS/<file.ext>`. For `eddy` options that produce additional outputs, the file will save in the output directory under the “EDDY” folder by using the following syntax: `--<myoutputoption>=/OUTPUTS/EDDY/<file.ext>`. Note that in this case `/INPUTS` and `/OUTPUTS` should be named exactly as is and are NOT the path to the input and output directory on your file system.
 
 Default = none
 
@@ -303,6 +304,12 @@ Default = off
 **--correct\_bias on/off**
 
 Perform [ANTs N4 bias field correction](https://manpages.debian.org/testing/ants/N4BiasFieldCorrection.1.en.html) as [called in MRTrix3](https://mrtrix.readthedocs.io/en/latest/reference/commands/dwibiascorrect.html). If this option is on, the calculated bias field will be visualized in the output PDF.
+
+Default = off
+
+**--improbable_mask on/off**
+
+Create an additional mask on the preprocessed data that omits voxels where the minimum b0 signal is smaller than the minimum diffusion weighted signal. This can be helpful for reducing artifacts near the mask border when fitting models.
 
 Default = off
 
@@ -450,7 +457,7 @@ Default = sess
 
 1. If the user chooses to, we then wrap up preprocessing with an N4 bias field correction as implemented in ANTs via MRTrix3’s dwibiascorrect.
 
-1. We generate a brain mask using FSL’s bet2 with the following options:
+1. We generate a brain mask using FSL’s bet2 with the following options. If applicable, we omit the voxels where the minimum b0 signal is less than the minimum diffusion weighted signal in an additional "improbable mask".
 
     `-f 0.25 -R`
 
@@ -494,7 +501,7 @@ Default = sess
 
    1. If pre- or post-normalization was performed, we then visualize the intra-mask histograms before and after these steps as well as the calculated scaling factors. If pre-normalization is not performed, we visualize the histograms that would have been generated with pre-normalization ONLY as a check for gain differences.
 
-   1. We then visualize the first b0 of the images before and after preprocessing with the contours of the brain and stats masks overlaid as well as the contours of the eddy mask overlaid if it is used.
+   1. We then visualize the first b0 of the images before and after preprocessing with the contours of the brain and stats masks overlaid as well as the contours of the eddy mask overlaid if it is used. We also report the percent of "improbable voxels" in the preprocessed mask, regardless of whether the improbable mask is saved.
 
    1. We plot the motion and angle correction done by eddy as well as the RMS displacement and median intensity for each volume and the volume’s associated b-value. These values are read in from an eddy output text file and we also compute and save the average of these values. In addition, we plot the outlier slices removed and then imputed by eddy as well as the chi-squared fit, with maximal bounds 0 to 0.2. The median chi-squared values are shown across volumes and slices.
 
@@ -691,6 +698,8 @@ Folders and files in *italics* are removed if `--keep_intermediates` is NOT indi
     * \<imageN\>\_preproc.bvec
 
     * **mask.nii.gz**
+
+    * improbable\_mask.nii.gz (only included if `--improbable_mask` is on)
 
 1. **TENSOR**
 
