@@ -44,6 +44,7 @@ From: ubuntu:18.04
 
     # Install ANTs
     apt-get -y install git g++ zlib1g-dev 
+    cd /INSTALLERS
 
     # get more recent version of cmake
     cmkversion=`cmake --version | head -n 1 | awk '{print $3}'`
@@ -66,7 +67,6 @@ From: ubuntu:18.04
         cd ..
     fi
 
-    cd /INSTALLERS
     mkdir ants_installer
     cd ants_installer
     git clone https://github.com/stnava/ANTs.git
