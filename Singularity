@@ -43,13 +43,35 @@ From: ubuntu:18.04
     cd /
 
     # Install ANTs
-    apt-get -y install git g++ zlib1g-dev cmake
+    apt-get -y install git g++ zlib1g-dev 
+
+    # get more recent version of cmake
+    cmkversion=`cmake --version | head -n 1 | awk '{print $3}'`
+    if [ -z $cmkversion ]; then
+        echo no cmake at all
+        cmkversion=0.0.0
+    fi
+    cmkreqd=3.16.01
+        echo we have cmake $cmkversion
+    if [ "$cmkreqd" = "`echo $cmkreqd\n$cmkversion | sort -V | head -1`" ]; then
+        echo We already have at least cmake 3.16
+    else
+        echo removing old and installing latest cmake
+        apt remove -y --purge cmake
+        hash -r
+        apt-get -y install build-essential
+        apt-get -y install libssl-dev
+        git clone https://github.com/Kitware/CMake/; cd CMake
+        ./bootstrap && make && make install
+        cd ..
+    fi
+
     cd /INSTALLERS
     mkdir ants_installer
     cd ants_installer
     git clone https://github.com/stnava/ANTs.git
     cd ANTs
-    git checkout a025d042f56561812172a1f6b2ae6848ad914767
+    git checkout 1c5ae7c42f1149d26505819a710b50e6867d2f31
     cd .. 
     mkdir ants_build
     cd ants_build
