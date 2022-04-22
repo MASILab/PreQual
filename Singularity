@@ -41,16 +41,35 @@ From: ubuntu:18.04
     wget -O /INSTALLERS/c3d-1.0.0-Linux-x86_64.tar.gz "https://downloads.sourceforge.net/project/c3d/c3d/1.0.0/c3d-1.0.0-Linux-x86_64.tar.gz?r=https%3A%2F%2Fsourceforge.net%2Fprojects%2Fc3d%2Ffiles%2Fc3d%2F1.0.0%2Fc3d-1.0.0-Linux-x86_64.tar.gz%2Fdownload&ts=1571934949"
     tar -xf /INSTALLERS/c3d-1.0.0-Linux-x86_64.tar.gz -C /APPS/
     cd /
-
-    # Install ANTs
-    apt-get -y install git g++ zlib1g-dev cmake
+    
+    # Install extra ANTs / cmake pre-reqs
+    apt-get -y install build-essential libssl-dev
+    
+    # Latest ANTs requires newer version of cmake then can be install through
+    # apt-get, so we need to build higher version of cmake from source
+    cd /INSTALLERS
+    mkdir cmake_install
+    cd cmake_install
+    wget https://github.com/Kitware/CMake/releases/download/v3.23.0-rc2/cmake-3.23.0-rc2.tar.gz
+    tar -xf cmake-3.23.0-rc2.tar.gz
+    cd cmake-3.23.0-rc2/
+    ./bootstrap
+    make
+    make install
+    
+    cd /
+    
+    # Install ANTS
     cd /INSTALLERS
     mkdir ants_installer
     cd ants_installer
-    git clone https://github.com/stnava/ANTs.git
-    cd ANTs
-    git checkout a025d042f56561812172a1f6b2ae6848ad914767
-    cd .. 
+
+    # Note: use latest version of ANTs
+    # If some level of specific verion of libraries / reproducibility
+    # is required we can checkout
+    # to an arbitrary commit here
+    git clone https://github.com/ANTsX/ANTs.git
+    # git checkout efa80e3f582d78733724c29847b18f3311a66b54
     mkdir ants_build
     cd ants_build
     cmake /INSTALLERS/ants_installer/ANTs -DCMAKE_INSTALL_PREFIX=/APPS/ants
