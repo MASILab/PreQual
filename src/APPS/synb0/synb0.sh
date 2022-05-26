@@ -3,6 +3,7 @@
 b0_d_file=$1
 t1_file=$2
 OUTPUTS=$3
+mni_1mm_atlas_fname=$4 # Can either be with (default) or without skull, depending on the input T1
 
 # Set absolute path variable for our custom executables
 abs_path=/APPS/synb0 # Change in container to /APPS/synb0
@@ -18,7 +19,7 @@ source $FREESURFER_HOME/SetUpFreeSurfer.sh # can't do this with singularity env 
 source $abs_path/pytorch/bin/activate
 
 # Prepare input
-prepare_input.sh $b0_d_file $t1_file $abs_path/atlases/mni_icbm152_t1_tal_nlin_asym_09c.nii.gz $abs_path/atlases/mni_icbm152_t1_tal_nlin_asym_09c_2_5.nii.gz $OUTPUTS
+prepare_input.sh $b0_d_file $t1_file $abs_path/atlases/$mni_1mm_atlas_fname $abs_path/atlases/mni_icbm152_t1_tal_nlin_asym_09c_2_5.nii.gz $OUTPUTS
 
 # Run inference
 NUM_FOLDS=5
@@ -37,5 +38,5 @@ echo Applying inverse xform to undistorted b0
 antsApplyTransforms -d 3 -i $OUTPUTS/b0_u_lin_atlas_2_5.nii.gz -r $b0_d_file -n BSpline -t [$OUTPUTS/epi_reg_d_ANTS.txt,1] -t [$OUTPUTS/ANTS0GenericAffine.mat,1] -o $OUTPUTS/b0_u.nii.gz
 
 # Done
-echo FINISHED SYNB0!!!
+echo synb0.sh complete!
 

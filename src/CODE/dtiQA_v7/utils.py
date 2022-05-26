@@ -132,6 +132,35 @@ def write_str(str_data, str_file):
     with open(str_file, 'w') as str_fobj:
         str_fobj.write(str_data)
 
+def nii_sform(nii_file, sform_dir):
+
+    nii_prefix = get_prefix(nii_file)
+
+    nii = nib.load(nii_file)
+    _, scode = nii.get_sform(coded=True)
+    _, qcode = nii.get_qform(coded=True)
+
+    if scode == 0 and qcode == 0:
+        best_aff = 'FALL-BACK'
+        txfm_warning_str = 'Both the sform and qform codes for {} were 0. The NIFTI file was resaved with the fall-back affine.'.format(nii_prefix)
+    elif scode == 0 and qcode != 0:
+        best_aff = 'Q-FORM'
+        txfm_warning_str = 'The sform code for {} was 0. The NIFTI file was resaved with the qform affine.'.format(nii_prefix)
+    elif scode != 0:
+        best_aff = 'S-FORM'
+        if qcode == 0:
+            txfm_warning_str = ''
+        elif qcode != 0:
+            txfm_warning_str = 'Both the sform and qform codes for {} were non-zero. The NIFTI file was resaved with the sform affine overriding the qform.'.format(nii_prefix)
+    
+    print('PER NIBABEL STANDARDS, THE BEST AFFINE FOR {} IS THE {} AFFINE. SAVING THIS TRANSFORM INTO BOTH THE SFORM (CODE = 2) AND QFORM (CODE = 0) FIELDS.'.format(nii_prefix, best_aff))
+
+    nii_sform_file = os.path.join(sform_dir, '{}_sform.nii.gz'.format(nii_prefix))
+    nii_sform = nib.Nifti1Image(nii.get_data(), nii.affine)
+    nib.save(nii_sform, nii_sform_file)
+
+    return nii_sform_file, txfm_warning_str
+
 # Function Definitions: Pipeline I/O
 
 def load_config(in_dir):
@@ -249,6 +278,8 @@ def dwi_denoise(dwi_file, denoised_dir):
 
     # Note: MRTrix3 build RC3.0 (newest at the time of writing this) prefs qform over sform across the board. Nibabel both prefs sform. I think FSL just saves both.
     # Be sure to put a file /etc/mrtrix.conf with the key: value pair "NIfTIUseSform: 1" to use the sform when both a qform and sform exist
+    #
+    # Edit: As of May 2022, we go through and only use the sform across the board. See nii_sform().
 
     dwi_prefix = get_prefix(dwi_file, file_ext='nii')
 

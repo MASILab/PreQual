@@ -84,7 +84,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
     for i in range(len(dwi_files)):
         inputs_str = '{}- {} ({}{}, {})\n'.format(inputs_str, utils.get_prefix(dwi_files[i]), pe_axis, pe_dirs[i], readout_times[i])
     if os.path.exists(t1_file):
-        inputs_str = '{}- {}'.format(inputs_str, utils.get_prefix(t1_file))
+        inputs_str = '{}- {} ({})'.format(inputs_str, utils.get_prefix(t1_file), 'unused' if not use_synb0 else 'skull-stripped' if params['t1_stripped'] else 'raw')
 
     method_strs, ref_strs = _methods_strs(use_topup, use_synb0, params)
 

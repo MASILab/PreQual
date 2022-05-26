@@ -34,7 +34,7 @@ def main():
     parser.add_argument('--degibbs', metavar='on/off', default='off', help='Remove Gibbs ringing artifacts from MRI images (default = off)')
     parser.add_argument('--rician', metavar='on/off', default='off', help='Perform Rician noise correction with method of moments (default = off)')
     parser.add_argument('--prenormalize', metavar='on/off', default='on', help='Normalize intensity distributions before preprocessing (default = on)')
-    parser.add_argument('--synb0', metavar='on/off', default='on', help='Run topup with a synthetic b0 generated with Synb0-DisCo if no reverse phase encoded images are supplied and a T1 is supplied (default = on)')
+    parser.add_argument('--synb0', metavar='raw/stripped/off', default='raw', help='Run topup with a synthetic b0 generated with Synb0-DisCo if no reverse phase encoded images are supplied and a raw or skull stripped T1 is supplied (default = raw)')
     parser.add_argument('--topup_first_b0s_only', action='store_true', help='Run topup with only the first b0 of each image when images have >1 b0 volume (default = run with ALL b0 volumes)')
     parser.add_argument('--extra_topup_args', metavar='string', default='', help='Extra arguments to pass to topup as a list separated by +\'s with no spaces (i.e., --extra_topup_args=--scale=1+--regrid=0)')
     parser.add_argument('--eddy_cuda', metavar='8.0/9.1/off', default='off', help='Run eddy with CUDA 8.0 or 9.1 or without GPU acceleration and with OPENMP only (default = off)')
@@ -130,10 +130,12 @@ def main():
     else:
         raise utils.DTIQAError('INVALID INPUT FOR --prenormalize PARAMETER. EXITING.')
 
-    if args.synb0 == 'on':
+    if args.synb0 == 'raw' or args.synb0 == 'stripped':
         params['use_synb0_user'] = True
+        params['t1_stripped'] = args.synb0 == 'stripped'
     elif args.synb0 == 'off':
         params['use_synb0_user'] = False
+        params['t1_stripped'] = False
     else:
         raise utils.DTIQAError('INVALID INPUT FOR --synb0 PARAMETER. EXITING.')
 
@@ -250,6 +252,8 @@ def main():
         print('- {}'.format(t1_file))
     print('PREPROCESSING:')
     print('- {}'.format('Eddy {}'.format('Only' if not use_topup else '+ Topup ({})'.format('Synb0' if use_synb0 else 'RPE'))))
+    if use_synb0:
+        print('- The provided T1 has {}been skull-stripped.'.format('' if params['t1_stripped'] else 'not '))
     print('PARAMETERS:')
     print('- BValue Threshold: {}'.format(params['bval_threshold']))
     print('- Shells: {}'.format(params['shells']))
@@ -279,6 +283,35 @@ def main():
     print('*************************************')
     print('*** DTIQA V7: I/O PARSED ({:05d}s) ***'.format(dt))
     print('*************************************\n')
+
+    # CHECK Q-FORM AND S-FORM
+
+    print('*************************************************')
+    print('*** DTIQA V7: CHECKING NIFTI HEADER TRANFORMS ***')
+    print('*************************************************')
+
+    ti = time.time()
+
+    sform_dir = utils.make_dir(out_dir, 'INPUTS_SFORM')
+
+    dwi_sform_files = []
+    for dwi_file in dwi_files:
+        dwi_sform_file, txfm_warning_str = utils.nii_sform(dwi_file, sform_dir)
+        dwi_sform_files.append(dwi_sform_file)
+        if not txfm_warning_str == '':
+            warning_strs.append(txfm_warning_str)
+
+    if os.path.exists(t1_file):
+        t1_sform_file, txfm_warning_str = utils.nii_sform(t1_file, sform_dir)
+        if not txfm_warning_str == '':
+            warning_strs.append(txfm_warning_str)
+
+    tf = time.time()
+    dt = round(tf - ti)
+
+    print('****************************************************')
+    print('*** DTIQA V7: HEADER TRANFORMS CHECKED ({:05d}s) ***'.format(dt))
+    print('****************************************************\n')
 
     # THRESHOLD B = 0
 
@@ -315,8 +348,8 @@ def main():
     dwi_checked_files = []
     bvals_checked_files = []
     bvecs_checked_files = []
-    for i in range(len(dwi_files)):
-        dwi_checked_file, bvals_checked_file, bvecs_checked_file, dwi_check_warning_str = utils.dwi_check(dwi_files[i], bvals_thresholded_files[i], bvecs_files[i], check_dir)
+    for i in range(len(dwi_sform_files)):
+        dwi_checked_file, bvals_checked_file, bvecs_checked_file, dwi_check_warning_str = utils.dwi_check(dwi_sform_files[i], bvals_thresholded_files[i], bvecs_files[i], check_dir)
         dwi_checked_files.append(dwi_checked_file)
         bvals_checked_files.append(bvals_checked_file)
         bvecs_checked_files.append(bvecs_checked_file)
@@ -470,7 +503,7 @@ def main():
     eddy_dir = utils.make_dir(out_dir, 'EDDY')
     
     topup_input_b0s_file, topup_acqparams_file, b0_d_file, b0_syn_file, eddy_input_dwi_file, eddy_input_bvals_file, eddy_input_bvecs_file, eddy_acqparams_file, eddy_index_file = \
-        preproc.prep(dwi_prenorm_files, bvals_checked_files, bvecs_checked_files, pe_axis, pe_dirs, readout_times, use_topup, use_synb0, t1_file, topup_dir, eddy_dir, params['eddy_bval_scale'], params['topup_first_b0s_only'])
+        preproc.prep(dwi_prenorm_files, bvals_checked_files, bvecs_checked_files, pe_axis, pe_dirs, readout_times, use_topup, use_synb0, t1_sform_file, params['t1_stripped'], topup_dir, eddy_dir, params['eddy_bval_scale'], params['topup_first_b0s_only'])
 
     tf = time.time()
     dt = round(tf - ti)
@@ -748,7 +781,7 @@ def main():
     if params['use_rician']:
         rician_vis_file = vis.vis_rician(dwi_degibbs_files, bvals_checked_files, dwi_rician_files, dwi_prenorm_gains, bvals_preproc_shelled, vis_dir)
     if use_synb0:
-        synb0_vis_file = vis.vis_synb0(b0_d_file, t1_file, b0_syn_file, vis_dir)
+        synb0_vis_file = vis.vis_synb0(b0_d_file, t1_sform_file, b0_syn_file, vis_dir)
     if params['use_prenormalize']:
         prenorm_label = 'Prenormalization'
     else:
@@ -851,6 +884,9 @@ def main():
     # Clear these intermediates if user desires:
 
     if not params['keep_intermediates']:
+
+        print('CLEARING SFORM DATA')
+        utils.remove_dir(sform_dir)
 
         print('CLEARING CHECKED DATA')
         utils.remove_dir(check_dir)

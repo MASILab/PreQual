@@ -16,7 +16,7 @@ from vars import SHARED_VARS
 
 # Define Preprocessing Functions
 
-def prep(dwi_files, bvals_files, bvecs_files, pe_axis, pe_dirs, readout_times, use_topup, use_synb0, t1_file, topup_dir, eddy_dir, eddy_bval_scale, topup_first_b0s_only):
+def prep(dwi_files, bvals_files, bvecs_files, pe_axis, pe_dirs, readout_times, use_topup, use_synb0, t1_file, t1_stripped, topup_dir, eddy_dir, eddy_bval_scale, topup_first_b0s_only):
 
     print('PREPARING FOR PREPROCESSING...')
 
@@ -74,7 +74,7 @@ def prep(dwi_files, bvals_files, bvecs_files, pe_axis, pe_dirs, readout_times, u
             # Run synb0 on first b0 of first DWI 4D sequence
 
             b0_d_file, _, _ = utils.dwi_extract(eddy_input_dwi_file, eddy_input_bvals_file, topup_dir, target_bval=0, first_only=True)
-            b0_syn_file = synb0(b0_d_file, t1_file, topup_dir)
+            b0_syn_file = synb0(b0_d_file, t1_file, topup_dir, stripped=t1_stripped)
 
             # Smooth input b0s file as per Justin's optimization of synb0
 
@@ -141,13 +141,15 @@ def prep(dwi_files, bvals_files, bvecs_files, pe_axis, pe_dirs, readout_times, u
 
     return topup_input_b0s_file, topup_acqparams_file, b0_d_file, b0_syn_file, eddy_input_dwi_file, eddy_input_bvals_file, eddy_input_bvecs_file, eddy_acqparams_file, eddy_index_file
 
-def synb0(b0_d_file, t1_file, synb0_dir):
+def synb0(b0_d_file, t1_file, synb0_dir, stripped=False):
 
-    print('RUNNING SYNB0 ON A 3D DISTORTED B0 AND A T1...')
+    print('RUNNING SYNB0 ON A 3D DISTORTED B0 AND A {}T1...'.format('SKULL STRIPPED ' if stripped else ''))
 
     temp_dir = utils.make_dir(synb0_dir, 'TEMP')
 
-    synb0_cmd = 'export OMP_NUM_THREADS={} ; bash {} {} {} {}'.format(SHARED_VARS.NUM_THREADS, SHARED_VARS.SYNB0_EXEC_FILE, b0_d_file, t1_file, temp_dir)
+    mni_fname = 'mni_icbm152_t1_tal_nlin_asym_09c_mask.nii.gz' if stripped else 'mni_icbm152_t1_tal_nlin_asym_09c.nii.gz'
+
+    synb0_cmd = 'export OMP_NUM_THREADS={} ; bash {} {} {} {} {}'.format(SHARED_VARS.NUM_THREADS, SHARED_VARS.SYNB0_EXEC_FILE, b0_d_file, t1_file, temp_dir, mni_fname)
     utils.run_cmd(synb0_cmd)
 
     print('MOVE OUTPUT TO B0_SYN.NII.GZ')

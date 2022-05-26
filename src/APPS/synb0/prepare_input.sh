@@ -34,13 +34,18 @@ NORMALIZE_CMD="normalize_T1.sh $T1_PATH $T1_N3_PATH $T1_NORM_PATH"
 echo $NORMALIZE_CMD
 eval $NORMALIZE_CMD
 
-# Skull strip T1
+# Skull strip T1 for epi_reg if not already stripped
 echo -------
-echo Skull stripping T1
-T1_MASK_PATH=$JOB_PATH/T1_mask.nii.gz
-BET_CMD="bet $T1_PATH $T1_MASK_PATH -R"
-echo $BET_CMD
-eval $BET_CMD
+if [[ "$T1_ATLAS_PATH" == *"mask"* ]]; then
+  echo T1 already skull stripped, skipping brain extraction
+  T1_MASK_PATH=$T1_PATH
+else
+  echo Skull stripping T1
+  T1_MASK_PATH=$JOB_PATH/T1_mask.nii.gz
+  BET_CMD="bet $T1_PATH $T1_MASK_PATH -R"
+  echo $BET_CMD
+  eval $BET_CMD
+fi
 
 # epi_reg distorted b0 to T1; wont be perfect since B0 is distorted
 echo -------
@@ -59,7 +64,7 @@ C3D_CMD="c3d_affine_tool -ref $T1_PATH -src $B0_D_PATH $EPI_REG_D_MAT_PATH -fsl2
 echo $C3D_CMD
 eval $C3D_CMD
 
-# ANTs register T1 to atlas
+# ANTs register T1 to atlas (both must be either full images or stripped images)
 echo -------
 echo ANTS syn registration
 ANTS_OUT=$JOB_PATH/ANTS
