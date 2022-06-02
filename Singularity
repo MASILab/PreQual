@@ -23,10 +23,9 @@ From: ubuntu:18.04
     cd APPS
     git clone https://github.com/MRtrix3/mrtrix3.git
     cd mrtrix3
-    git checkout 3.0.0
+    git checkout 3.0.3
     ./configure
     ./build
-    echo "NIfTIUseSform: 1" > /etc/mrtrix.conf # prefer sform to qform when they both exist (to align with nibabel behavior. FSL maintains both--see https://community.mrtrix.org/t/inconsistent-qform-sform-on-nifti-image/1663)
     cd /
 
     # Install FSL
@@ -42,15 +41,26 @@ From: ubuntu:18.04
     tar -xf /INSTALLERS/c3d-1.0.0-Linux-x86_64.tar.gz -C /APPS/
     cd /
 
-    # Install ANTs
-    apt-get -y install git g++ zlib1g-dev cmake
+    # Install ANTs (and compatible CMake)
+    apt-get -y install build-essential libssl-dev
+    # CMake: The latest ANTs requires newer version of cmake than can be installed
+    # through apt-get, so we need to build higher version of cmake from source
+    cd /INSTALLERS
+    mkdir cmake_install
+    cd cmake_install
+    wget https://github.com/Kitware/CMake/releases/download/v3.23.0-rc2/cmake-3.23.0-rc2.tar.gz
+    tar -xf cmake-3.23.0-rc2.tar.gz
+    cd cmake-3.23.0-rc2/
+    ./bootstrap
+    make
+    make install
+    cd /
+    # ANTS
     cd /INSTALLERS
     mkdir ants_installer
     cd ants_installer
-    git clone https://github.com/stnava/ANTs.git
-    cd ANTs
-    git checkout a025d042f56561812172a1f6b2ae6848ad914767
-    cd .. 
+    git clone https://github.com/ANTsX/ANTs.git
+    git checkout efa80e3f582d78733724c29847b18f3311a66b54
     mkdir ants_build
     cd ants_build
     cmake /INSTALLERS/ants_installer/ANTs -DCMAKE_INSTALL_PREFIX=/APPS/ants
@@ -85,7 +95,7 @@ From: ubuntu:18.04
     cd /INSTALLERS
     git clone https://github.com/MASILab/PreQual.git
     cd PreQual
-    git checkout v1.0.6
+    # git checkout v1.0.6
     mv src/APPS/* /APPS
     mv src/CODE/* /CODE
     mv src/SUPPLEMENTAL/* /SUPPLEMENTAL

@@ -66,7 +66,7 @@ Note: The phase encoding axis, direction, and readout time must be known ahead o
 
     git clone https://github.com/MASILab/PreQual.git
     cd /path/to/repo/PreQual
-    git checkout v1.0.6
+    git checkout v1.0.7
     sudo singularity build /path/to/prequal.simg Singularity
 
 We use Singularity version 3.4 with root permissions.
@@ -216,11 +216,11 @@ Intensity normalize images prior to preprocessing by maximizing the intra-mask i
 
 Default = on
 
-**--synb0 on/off**
+**--synb0 raw/stripped/off**
 
-Run `topup` with a synthetic b0 generated with the Synb0-DisCo deep-learning framework if no reverse phase encoded images are supplied and a T1 image is supplied. Synb0-DisCo requires at least 24GB of RAM.
+Run `topup` with a synthetic b0 generated with the Synb0-DisCo deep-learning framework if no reverse phase encoded images are supplied and a raw or skull-stripped T1 image is supplied. Synb0-DisCo requires at least 24GB of RAM.
 
-Default = on
+Default = raw
 
 **--topup\_first\_b0s\_only**
 
@@ -397,7 +397,7 @@ Default = sess
 
 * For preprocessing, eddy will motion correct to the first b0 of each image.
 
-* MRTrix3 by default preferentially uses the qform for understanding NIFTI orientations. Nibabel uses the sform. We set MRTrix3 to use the sform in our pipeline, and thus we preferentially use the sform when the two don’t match.
+* NIFTI files inherently have three transformations in the header: the sform, qform, and the fall-back. Different software prefer to use different transformations. We follow the [Nibabel standard](https://nipy.org/nibabel/nifti_images.html#choosing-the-image-affine) (sform > qform > fall-back). To explicitly ensure this, we check all NIFTI inputs to determine their optimal affines as captured by Nibabel, then resave all inputs placing the optimal affines in both the sform (code = 2) and qform (code = 0) fields. Additionally, if the optimal affines are not the sform, we report warnings on the output PDF.
 
 * No b0 drift correction is performed.
 
