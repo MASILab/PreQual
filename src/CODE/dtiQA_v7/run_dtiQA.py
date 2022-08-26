@@ -301,6 +301,7 @@ def main():
         if not txfm_warning_str == '':
             warning_strs.append(txfm_warning_str)
 
+    t1_sform_file = None
     if os.path.exists(t1_file):
         t1_sform_file, txfm_warning_str = utils.nii_sform(t1_file, sform_dir)
         if not txfm_warning_str == '':
