@@ -66,7 +66,7 @@ Note: The phase encoding axis, direction, and readout time must be known ahead o
 
     git clone https://github.com/MASILab/PreQual.git
     cd /path/to/repo/PreQual
-    git checkout v1.0.7
+    git checkout v1.0.8
     sudo singularity build /path/to/prequal.simg Singularity
 
 We use Singularity version 3.4 with root permissions.

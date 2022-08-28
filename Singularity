@@ -95,7 +95,7 @@ From: ubuntu:18.04
     cd /INSTALLERS
     git clone https://github.com/MASILab/PreQual.git
     cd PreQual
-    git checkout v1.0.7
+    git checkout v1.0.8
     mv src/APPS/* /APPS
     mv src/CODE/* /CODE
     mv src/SUPPLEMENTAL/* /SUPPLEMENTAL
