@@ -48,6 +48,7 @@ def main():
     parser.add_argument('--atlas_reg_type', metavar='FA/b0', default='FA', help='Register to the JHU atlas by using the subject FA map or the subject average preprocessed b0 (default = FA)')
     parser.add_argument('--split_outputs', action='store_true', help='Split preprocessed output to match structure of input files (default = do NOT split)')
     parser.add_argument('--keep_intermediates', action='store_true', help='Keep intermediate copies of data (default = do NOT keep)')
+    parser.add_argument('--use_grad', metavar='string', help='Path to the gradient tensor (default = off)')
     parser.add_argument('--num_threads', metavar='N', default=1, help='Non-negative integer indicating number of threads to use when running multi-threaded steps of this pipeline (default = 1)')
     parser.add_argument('--project', metavar='string', default='proj', help='Project ID (default = proj)')
     parser.add_argument('--subject', metavar='string', default='subj', help='Subject ID (default = subj)')
@@ -214,6 +215,8 @@ def main():
     else:
         raise utils.DTIQAError('INVALID INPUT FOR --num_threads PARAMETER. EXITING.')
 
+    params['use_grad'] = args.use_grad
+        
     params['project'] = args.project
     params['subject'] = args.subject
     params['session'] = args.session
@@ -275,6 +278,7 @@ def main():
     print('- Split Outputs: {}'.format(params['split_outputs']))
     print('- Keep Intermediates: {}'.format(params['keep_intermediates']))
     print('- Number of Threads: {}'.format(SHARED_VARS.NUM_THREADS))
+    print('- Nonlinear Gradient Correction: {}'.format(params['use_grad']))
     print('OUTPUT DIRECTORY: {}'.format(out_dir))
 
     tf = time.time()
@@ -762,6 +766,33 @@ def main():
     print('********************************************************')
     print('*** DTIQA V7: FINISHED STATISTICAL ANALYSES ({:05d}s) ***'.format(dt))
     print('********************************************************\n')
+
+    # PERFORM GRADIENT NONLINEARITY CORRECTION
+ 
+    print('**************************************************')
+    print('*** DTIQA V7: CORRECTING GRADIENT NONLINEARITY ***')
+    print('**************************************************')
+
+    ti = time.time()
+
+    grad_nonlinear_dir = utils.make_dir(out_dir, 'GRADNONLINEAR_CORRECTED')
+
+    if params['use_grad']:
+        L_file = args.use_grad
+        dwi_grad_corrected_file = gradtensor(L_file, dwi_preproc_file, bvecs_preproc_file, bvals_preproc_file, grad_nonlinear_dir, SHARED_VARS.NUM_THREADS)
+
+    else:
+
+        print('SKIPPING BIAS FIELD CORRECTION')
+
+        #dwi_unbiased_file = dwi_norm_file
+
+    #bvals_unbiased_file = bvals_norm_file
+    #bvecs_unbiased_file = bvecs_norm_file
+
+    print('***********************************************')
+    print('*** DTIQA V7: GRADIENT NONLINEARITY CORRECTED ({:05d}s) ***'.format(dt))
+    print('***********************************************\n')
 
     # GENERATE PDF
 
