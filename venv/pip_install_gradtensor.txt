@@ -1,0 +1,4 @@
+nibabel==3.0.2
+numpy==1.21.6
+pkg-resources==0.0.0
+dipy==1.5.0
