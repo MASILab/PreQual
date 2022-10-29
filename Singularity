@@ -91,7 +91,7 @@ From: ubuntu:18.04
     
     # Install source code
     cd /
-    apt-get -y install git gcc libpq-dev python-dev python-pip python3 python3-dev python3-pip python3-venv python3-wheel
+    apt-get -y install git gcc libpq-dev python-dev python-pip python3 python3-dev python3-pip python3-venv python3-wheel libpng-dev libfreetype6-dev
     cd /INSTALLERS
     git clone https://github.com/MASILab/PreQual.git
     cd PreQual
@@ -110,6 +110,14 @@ From: ubuntu:18.04
     source venv/bin/activate
     pip3 install wheel
     pip install -r /INSTALLERS/PreQual/venv/pip_install_dtiQA.txt
+    deactivate
+    cd /APPS/synb0
+    python3.8 -m venv gradvenv
+    source gradvenv/bin/activate
+    pip3 install wheel
+    pip install -r /INSTALLERS/PreQual/venv/pip_install_gradtensor.txt
+    pip install fpdf imageio freetype-py pypng numpy==1.22.* --no-binary numpy
+    pip install -e git://github.com/frheault/scilpy.git@487c8a0#egg=scilpy
     deactivate
     cd /
 
@@ -143,6 +151,14 @@ From: ubuntu:18.04
     export PATH="/usr/local/cuda/bin:$PATH"
     export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
     export CUDA_HOME="/usr/local/cuda"
+
+    # MATLAB 2017a
+    mkdir /MCR
+    wget -nv -P /MCR http://ssd.mathworks.com/supportfiles/downloads/R2017a/deployment_files/R2017a/installers/glnxa64/MCR_R2017a_glnxa64_installer.zip
+    unzip -q /MCR/MCR_R2017a_glnxa64_installer.zip -d /MCR/MCR_R2017a_glnxa64_installer
+    /MCR/MCR_R2017a_glnxa64_installer/install -mode silent -agreeToLicense yes
+    rm -r /MCR/MCR_R2017a_glnxa64_installer /MCR/MCR_R2017a_glnxa64_installer.zip
+    rmdir /MCR
 
 %runscript
 
