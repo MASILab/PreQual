@@ -152,7 +152,8 @@ From: ubuntu:18.04
     export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
     export CUDA_HOME="/usr/local/cuda"
 
-    # MATLAB 2017a
+    # Download the Matlab Compiled Runtime installer, install, clean up
+    apt-get install -y wget unzip openjdk-8-jre libxt6
     mkdir /MCR
     wget -nv -P /MCR http://ssd.mathworks.com/supportfiles/downloads/R2017a/deployment_files/R2017a/installers/glnxa64/MCR_R2017a_glnxa64_installer.zip
     unzip -q /MCR/MCR_R2017a_glnxa64_installer.zip -d /MCR/MCR_R2017a_glnxa64_installer
