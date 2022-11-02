@@ -834,7 +834,9 @@ def main():
     stats_vis_file = vis.vis_stats(dwi_preproc_file, bvals_preproc_file, mask_file, chisq_matrix_file, motion_dict, eddy_dir, vis_dir)
     gradcheck_vis_file = vis.vis_gradcheck(bvals_checked_files, bvecs_checked_files, bvals_preproc_file, bvecs_preproc_file, bvals_corrected_file, bvecs_corrected_file, vis_dir)
     if params['use_unbias']:
-        bias_vis_file = vis.vis_bias(dwi_norm_file, bvals_norm_file, dwi_unbiased_file, bias_field_file, vis_dir)
+        bias_vis_file = vis.vis_bias(dwi_norm_file, bvals_norm_file, dwi_unbiased_file, bias_field_file, vis_dir,'N4 Bias Field Correction','Biased','Bias Field','Unbiased')
+    if params['use_grad']:
+        grad_vis_file = vis.vis_bias(dwi_unbiased_file, bvals_unbiased_file, dwi_grad_corrected_file, gradtensor_file, vis_dir, 'Gradient Nonlienarity Field Correction','Uncorrected','Gradient Nonlienarity Field','Corrected')
     dwi_vis_files = vis.vis_dwi(dwi_preproc_file, bvals_preproc_shelled, bvecs_preproc_file, cnr_dict, vis_dir)
     glyph_vis_file = vis.vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_type=params['glyph_type'])
     fa_vis_file = vis.vis_scalar(fa_file, vis_dir, name='FA', comment='White matter should be bright')
@@ -859,6 +861,8 @@ def main():
     vis_files.append(stats_vis_file)
     if params['use_unbias']:
         vis_files.append(bias_vis_file)
+    if params['use_grad']:
+        vis_files.append(grad_vis_file)
     vis_files.append(gradcheck_vis_file)
     for dwi_vis_file in dwi_vis_files:
         vis_files.append(dwi_vis_file)

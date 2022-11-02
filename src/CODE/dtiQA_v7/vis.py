@@ -376,11 +376,11 @@ def vis_norm(dwi_files, dwi_norm_files, gains, bins, hists, hists_normed, title,
 
     return norm_vis_file
 
-def vis_bias(dwi_file, bvals_file, dwi_unbiased_file, bias_field_file, vis_dir):
+def vis_bias(dwi_file, bvals_file, dwi_unbiased_file, bias_field_file, vis_dir,title,col1,col2,col3):
 
     temp_dir = utils.make_dir(vis_dir, 'TEMP')
 
-    print('VISUALIZING N4 BIAS FIELD CORRECTION')
+    print('VISUALIZING' + title)
 
     b0_file, _, _ = utils.dwi_extract(dwi_file, bvals_file, temp_dir, target_bval=0, first_only=True)
     b0_unbiased_file, _, _ = utils.dwi_extract(dwi_unbiased_file, bvals_file, temp_dir, target_bval=0, first_only=True)
@@ -394,7 +394,7 @@ def vis_bias(dwi_file, bvals_file, dwi_unbiased_file, bias_field_file, vis_dir):
     plt.subplot(3, 3, 1)
     utils.plot_slice(slices=b0_slices, img_dim=0, offset_index=0, vox_dim=b0_vox_dim, img_min=b0_min, img_max=b0_max)
     plt.colorbar()
-    plt.title('Biased', fontsize=SHARED_VARS.LABEL_FONTSIZE)
+    plt.title(col1, fontsize=SHARED_VARS.LABEL_FONTSIZE)
     plt.ylabel('Sagittal', fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     plt.subplot(3, 3, 4)
@@ -410,7 +410,7 @@ def vis_bias(dwi_file, bvals_file, dwi_unbiased_file, bias_field_file, vis_dir):
     plt.subplot(3, 3, 2)
     utils.plot_slice(slices=bias_field_slices, img_dim=0, offset_index=0, vox_dim=bias_field_vox_dim, img_min=bias_field_min, img_max=bias_field_max)
     plt.colorbar()
-    plt.title('Bias Field', fontsize=SHARED_VARS.LABEL_FONTSIZE)
+    plt.title(col2, fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     plt.subplot(3, 3, 5)
     utils.plot_slice(slices=bias_field_slices, img_dim=1, offset_index=0, vox_dim=bias_field_vox_dim, img_min=bias_field_min, img_max=bias_field_max)
@@ -423,7 +423,7 @@ def vis_bias(dwi_file, bvals_file, dwi_unbiased_file, bias_field_file, vis_dir):
     plt.subplot(3, 3, 3)
     utils.plot_slice(slices=b0_unbiased_slices, img_dim=0, offset_index=0, vox_dim=b0_unbiased_vox_dim, img_min=b0_unbiased_min, img_max=b0_unbiased_max)
     plt.colorbar()
-    plt.title('Unbiased', fontsize=SHARED_VARS.LABEL_FONTSIZE)
+    plt.title(col3, fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     plt.subplot(3, 3, 6)
     utils.plot_slice(slices=b0_unbiased_slices, img_dim=1, offset_index=0, vox_dim=b0_unbiased_vox_dim, img_min=b0_unbiased_min, img_max=b0_unbiased_max)
@@ -436,7 +436,7 @@ def vis_bias(dwi_file, bvals_file, dwi_unbiased_file, bias_field_file, vis_dir):
     plt.tight_layout()
 
     plt.subplots_adjust(top=0.925)
-    plt.suptitle('N4 Bias Field Correction', fontsize=SHARED_VARS.TITLE_FONTSIZE)
+    plt.suptitle(title, fontsize=SHARED_VARS.TITLE_FONTSIZE)
 
     bias_vis_file = os.path.join(vis_dir, 'bias.pdf')
     plt.savefig(bias_vis_file, dpi=SHARED_VARS.PDF_DPI)
