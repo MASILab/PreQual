@@ -9,14 +9,13 @@ num_threads=$6
 
 echo $L_file $dwi_file $org_bval_file $org_bvec_file $out_dir
 # Set absolute path variable for our custom executables
-#abs_path=/APPS/gradtensor # Change in container to /APPS/synb0
+abs_path=/APPS/gradtensor # Change in container to /APPS/gradtensor
 
 # Set path for executable
-#export PATH=$PATH:$abs_path
+export PATH=$PATH:$abs_path
 
 # Set up venv
-#source $abs_path/bin/activate
-source /home/local/VANDERBILT/kanakap/py38-venv/bin/activate
+source $abs_path/gradvenv/bin/activate
 
 # Prep inputs for gradtensor to b
 echo Preparing the inputs for gradnonlinearity correction
@@ -25,8 +24,8 @@ python prep_inputs.py $org_bvec_file $org_bval_file $out_dir
 
 # Run gradtensor to b #/usr/local/MATLAB/MATLAB_Runtime/v92 \
 echo Computing bimages with gradnonlinearity tensor
-/nfs/masi/kanakap/projects/LR/scripts/PreQual/src/APPS/gradtensor/run_apply_gradtensor_to_b.sh \
-/home/local/VANDERBILT/kanakap/MATLAB_2017a_Runtime/v92 \
+/APPS/gradtensor/run_apply_gradtensor_to_b.sh \
+/usr/local/MATLAB/MATLAB_2017a_Runtime/v92 \
 Limg_file $L_file \
 refimg_file $dwi_file \
 bval_file $out_dir/org.bval \
