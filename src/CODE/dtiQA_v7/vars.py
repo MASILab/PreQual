@@ -29,6 +29,10 @@ class SharedVars():
 
         self.SYNB0_EXEC_FILE = os.path.join(app_dir, 'synb0', 'synb0.sh')
 
+        # Define Synb0-DisCo variables
+
+        self.GRADTENSOR_EXEC_FILE = os.path.join(app_dir, 'gradtensor', 'gradtensor.sh')
+
         # Define topup variables
 
         self.TOPUP_CNF_FILE = os.path.join(supplemental_dir, 'topup.cnf')

@@ -55,6 +55,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
         '- Extra Eddy Args: {}\n'
         '- Run Postnormalize: {}\n'
         '- Run N4 Bias Field Correction: {}\n'
+        '- Run Gradient Nonlinearity Correction: {}\n'
         '- Mask Improbable Voxels: {}\n'
         '- Glyph Visualization Type: {}\n'
         '- Atlas Registration Type: {}\n'
@@ -74,6 +75,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
                 params['extra_eddy_args'],
                 params['use_postnormalize'],
                 params['use_unbias'],
+                params['use_grad'],
                 params['improbable_mask'],
                 params['glyph_type'],
                 params['atlas_reg_type'],
