@@ -91,7 +91,7 @@ From: ubuntu:18.04
     
     # Install source code
     cd /
-    apt-get -y install git gcc libpq-dev python-dev python-pip python3 python3-dev python3-pip python3-venv python3-wheel libpng-dev libfreetype6-dev
+    apt-get -y install wget git gcc libpq-dev python-dev python-pip python3 python3.8 python3.8-venv python3.8-dev python3-dev python3-pip python3-venv python3-wheel libpng-dev libfreetype6-dev libblas3 liblapack3 libblas-dev liblapack-dev pkg-config
     cd /INSTALLERS
     git clone https://github.com/MASILab/PreQual.git
     cd PreQual
@@ -111,13 +111,18 @@ From: ubuntu:18.04
     pip3 install wheel
     pip install -r /INSTALLERS/PreQual/venv/pip_install_dtiQA.txt
     deactivate
-    cd /APPS/synb0
+    cd /APPS/gradtensor
     python3.8 -m venv gradvenv
     source gradvenv/bin/activate
     pip3 install wheel
-    pip install -r /INSTALLERS/PreQual/venv/pip_install_gradtensor.txt
-    pip install fpdf imageio freetype-py pypng numpy==1.22.* --no-binary numpy
-    pip install -e git://github.com/frheault/scilpy.git@487c8a0#egg=scilpy
+    wget https://bootstrap.pypa.io/get-pip.py
+    python3.8 get-pip.py
+    pip3 install --upgrade setuptools
+    pip install fpdf imageio pypng freetype-py numpy==1.21.*
+    git clone https://github.com/scilus/scilpy.git
+    cd scilpy
+    pip install -e .
+    cd ..
     deactivate
     cd /
 

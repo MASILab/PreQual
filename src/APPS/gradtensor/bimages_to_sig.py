@@ -51,7 +51,8 @@ for i in bval:
     ind_0_b = np.where((og_bval == 0) | (og_bval == i))
 
     # Set up memory for corrected signal and data for bval
-    path = os.mkdir(os.path.join(out_dir,'TMP'))
+    path = os.path.join(out_dir,'TMP')
+    os.mkdir(path)
     xaxis = range(n.shape[0])
     yaxis = range(n.shape[1])
     zaxis = range(n.shape[2]) 
@@ -66,7 +67,7 @@ for i in bval:
     sh_order = get_sh_order(ind_b[0].shape[0])
 
     # Call the main reconstruct_signal_at_voxel script
-    print('b-value:',str(i),',No. of directions:',str(ind_b[0].shape[0]) ,',SH order',sh_order)
+    print('b-value:',str(i),', No. of directions:',str(ind_b[0].shape[0]) ,', SH order',sh_order)
     results = Parallel(n_jobs=int(num_cores))(delayed(reconstruct_signal_at_voxel)(i,j,k,data,org_bvec,org_bval,corr_bvec,corr_bval,dwi_hat,sh_order) for k in zaxis for j in yaxis for i in xaxis)
     dwmri_corrected[:,:,:,ind_b0] = n[:,:,:,ind_b0] 
     dwmri_corrected[:,:,:,ind_b[0]] = dwi_hat

@@ -650,36 +650,6 @@ def main():
     print('*** DTIQA V7: BIAS FIELD CORRECTED ({:05d}s) ***'.format(dt))
     print('************************************************\n')
 
-    # PERFORM GRADIENT NONLINEARITY CORRECTION
- 
-    print('**************************************************')
-    print('*** DTIQA V7: CORRECTING GRADIENT NONLINEARITY ***')
-    print('**************************************************')
-
-    ti = time.time()
-    
-    grad_nonlinear_dir = utils.make_dir(out_dir, 'GRADNONLINEAR_CORRECTED')
-
-    if params['use_grad']:
-        gradtensor_file = os.path.join(in_dir, 'gradtensor.nii.gz')
-        dwi_grad_corrected_file = preproc.gradtensor(gradtensor_file, dwi_unbiased_file, bvecs_unbiased_file, bvals_unbiased_file, grad_nonlinear_dir, SHARED_VARS.NUM_THREADS)
-
-    else:
-
-        print('SKIPPING BIAS FIELD CORRECTION')
-
-        dwi_grad_corrected_file = dwi_unbiased_file
-
-    bvals_grad_corrected_file = bvals_unbiased_file
-    bvecs_grad_corrected_file = bvecs_unbiased_file
-
-    tf = time.time()
-    dt = round(tf - ti)
-
-    print('***********************************************')
-    print('*** DTIQA V7: GRADIENT NONLINEARITY CORRECTED ({:05d}s) ***'.format(dt))
-    print('***********************************************\n')
-
     # FORMALIZE OUTPUTS IN PREPROCESSED FOLDER
 
     print('*************************************')
@@ -695,9 +665,9 @@ def main():
     bvals_preproc_file = os.path.join(preproc_dir, '{}.bval'.format(preproc_prefix))
     bvecs_preproc_file = os.path.join(preproc_dir, '{}.bvec'.format(preproc_prefix))
 
-    utils.copy_file(dwi_grad_corrected_file, dwi_preproc_file)
-    utils.copy_file(bvals_grad_corrected_file, bvals_preproc_file)
-    utils.copy_file(bvecs_grad_corrected_file, bvecs_preproc_file)
+    utils.copy_file(dwi_unbiased_file, dwi_preproc_file)
+    utils.copy_file(bvals_unbiased_file, bvals_preproc_file)
+    utils.copy_file(bvecs_unbiased_file, bvecs_preproc_file)
 
     tf = time.time()
     dt = round(tf - ti)
@@ -729,6 +699,40 @@ def main():
     print('*** DTIQA V7: PREPROCESSED MASK SAVED ({:05d}s) ***'.format(dt))
     print('***************************************************\n')
 
+        # PERFORM GRADIENT NONLINEARITY CORRECTION
+ 
+    print('**************************************************')
+    print('*** DTIQA V7: CORRECTING GRADIENT NONLINEARITY ***')
+    print('**************************************************')
+
+    ti = time.time()
+    
+    grad_nonlinear_dir = utils.make_dir(out_dir, 'GRADNONLINEAR_CORRECTED')
+
+    if params['use_grad']:
+        gradtensor_file = os.path.join(in_dir, 'gradtensor.nii.gz')
+        dwi_grad_corrected_file = preproc.gradtensor(gradtensor_file, dwi_preproc_file, bvecs_preproc_file, bvals_preproc_file, grad_nonlinear_dir, SHARED_VARS.NUM_THREADS)
+        # For visualization
+        resmaple_gradtensor_file = os.path.join(grad_nonlinear_dir,'L_resamp.nii.gz')
+        gradtensor_tensor_file, _ = preproc.tensor(resmaple_gradtensor_file, bvals_preproc_file, bvecs_preproc_file, mask_file, grad_nonlinear_dir)
+        gradtensor_fa_file, _, _, _, _ = preproc.scalars(gradtensor_tensor_file, mask_file, grad_nonlinear_dir)
+
+    else:
+
+        print('SKIPPING BIAS FIELD CORRECTION')
+
+        dwi_grad_corrected_file = dwi_preproc_file
+
+    bvals_grad_corrected_file = bvals_unbiased_file
+    bvecs_grad_corrected_file = bvecs_unbiased_file
+
+    tf = time.time()
+    dt = round(tf - ti)
+
+    print('***********************************************')
+    print('*** DTIQA V7: GRADIENT NONLINEARITY CORRECTED ({:05d}s) ***'.format(dt))
+    print('***********************************************\n')
+
     # GENERATE TENSOR
 
     print('**************************************************************')
@@ -739,7 +743,8 @@ def main():
 
     tensor_dir = utils.make_dir(out_dir, 'TENSOR')
 
-    tensor_file, dwi_recon_file = preproc.tensor(dwi_preproc_file, bvals_preproc_file, bvecs_preproc_file, mask_file, tensor_dir)
+    tensor_file, dwi_recon_file = preproc.tensor(dwi_grad_corrected_file, bvals_grad_corrected_file, bvecs_grad_corrected_file, mask_file, tensor_dir)
+    # tensor_file, dwi_recon_file = preproc.tensor(dwi_preproc_file, bvals_preproc_file, bvecs_preproc_file, mask_file, tensor_dir)
 
     tf = time.time()
     dt = round(tf - ti)
@@ -834,9 +839,9 @@ def main():
     stats_vis_file = vis.vis_stats(dwi_preproc_file, bvals_preproc_file, mask_file, chisq_matrix_file, motion_dict, eddy_dir, vis_dir)
     gradcheck_vis_file = vis.vis_gradcheck(bvals_checked_files, bvecs_checked_files, bvals_preproc_file, bvecs_preproc_file, bvals_corrected_file, bvecs_corrected_file, vis_dir)
     if params['use_unbias']:
-        bias_vis_file = vis.vis_bias(dwi_norm_file, bvals_norm_file, dwi_unbiased_file, bias_field_file, vis_dir,'N4 Bias Field Correction','Biased','Bias Field','Unbiased')
+        bias_vis_file = vis.vis_bias(dwi_norm_file, bvals_norm_file, dwi_unbiased_file, bias_field_file, vis_dir)
     if params['use_grad']:
-        grad_vis_file = vis.vis_bias(dwi_unbiased_file, bvals_unbiased_file, dwi_grad_corrected_file, gradtensor_file, vis_dir, 'Gradient Nonlienarity Field Correction','Uncorrected','Gradient Nonlienarity Field','Corrected')
+        grad_vis_file = vis.vis_grad(bvals_unbiased_file, dwi_grad_corrected_file, resmaple_gradtensor_file, gradtensor_fa_file, mask_file, vis_dir)
     dwi_vis_files = vis.vis_dwi(dwi_preproc_file, bvals_preproc_shelled, bvecs_preproc_file, cnr_dict, vis_dir)
     glyph_vis_file = vis.vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_type=params['glyph_type'])
     fa_vis_file = vis.vis_scalar(fa_file, vis_dir, name='FA', comment='White matter should be bright')
