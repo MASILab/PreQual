@@ -463,34 +463,37 @@ def vis_grad(bvals_file, dwi_corr_file, grad_field_file, fa_grad_field_file, mas
     plt.figure(0, figsize=SHARED_VARS.PAGESIZE)
 
     plt.subplot(3, 3, 1)
+    utils.plot_slice_contour(mask_slices, img_dim=0, offset_index=0, color='b')
     utils.plot_slice(slices=b0_corr_slices, img_dim=0, offset_index=0, vox_dim=b0_corr_vox_dim, img_min=b0_corr_min, img_max=b0_corr_max)
     plt.colorbar()
     plt.title('Corrected', fontsize=SHARED_VARS.LABEL_FONTSIZE)
     plt.ylabel('Sagittal', fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     plt.subplot(3, 3, 4)
+    utils.plot_slice_contour(mask_slices, img_dim=1, offset_index=0, color='b')
     utils.plot_slice(slices=b0_corr_slices, img_dim=1, offset_index=0, vox_dim=b0_corr_vox_dim, img_min=b0_corr_min, img_max=b0_corr_max)
     plt.colorbar()
     plt.ylabel('Coronal', fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     plt.subplot(3, 3, 7)
+    utils.plot_slice_contour(mask_slices, img_dim=2, offset_index=0, color='b')
     utils.plot_slice(slices=b0_corr_slices, img_dim=2, offset_index=0, vox_dim=b0_corr_vox_dim, img_min=b0_corr_min, img_max=b0_corr_max)
     plt.colorbar()
     plt.ylabel('Axial', fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     plt.subplot(3, 3, 2)
-    utils.plot_slice_contour(mask_slices, img_dim=0, offset_index=0, color='k')
+    utils.plot_slice_contour(mask_slices, img_dim=0, offset_index=0, color='b')
     utils.plot_slice(slices=grad_field_slices, img_dim=0, offset_index=0, vox_dim=grad_field_vox_dim, img_min=grad_field_min, img_max=grad_field_max)
     plt.colorbar()
     plt.title('Det. of Gradient Nonlinear Field', fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     plt.subplot(3, 3, 5)
-    utils.plot_slice_contour(mask_slices, img_dim=0, offset_index=0, color='k')
+    utils.plot_slice_contour(mask_slices, img_dim=0, offset_index=0, color='b')
     utils.plot_slice(slices=grad_field_slices, img_dim=1, offset_index=0, vox_dim=grad_field_vox_dim, img_min=grad_field_min, img_max=grad_field_max)
     plt.colorbar()
 
     plt.subplot(3, 3, 8)
-    utils.plot_slice_contour(mask_slices, img_dim=0, offset_index=0, color='k')
+    utils.plot_slice_contour(mask_slices, img_dim=0, offset_index=0, color='b')
     utils.plot_slice(slices=grad_field_slices, img_dim=2, offset_index=0, vox_dim=grad_field_vox_dim, img_min=grad_field_min, img_max=grad_field_max)
     plt.colorbar()
 
