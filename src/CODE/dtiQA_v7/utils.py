@@ -932,3 +932,17 @@ def _unique_prefixes(volume_prefixes):
     unique_volume_prefix_indices.sort()
     unique_volume_prefixes = volume_prefixes[unique_volume_prefix_indices]
     return unique_volume_prefixes
+
+def gradtensor_gradient_table(grad_nonlinear_dir):
+
+    bvecs_gradtensor_file = os.path.join(grad_nonlinear_dir, 'gradtensor_bvec.bvec')
+    bvals_gradtensor_file = os.path.join(grad_nonlinear_dir, 'gradtensor_bval.bval')
+    with open(bvecs_gradtensor_file, 'w') as f:
+        bvec = "-0.966 0.234 -0.773 0.025 0.155 0.853 -0.025 0.745 0.625 \n \
+                -0.107 -0.093 -0.147 0.716 -0.904 0.004 0.095 -0.623 0.776 \n \
+                -0.236 -0.968 -0.617 -0.698 -0.399 -0.522 0.995 0.237 0.076"
+        f.write(bvec)
+    with open(bvals_gradtensor_file, 'w') as f:
+        bval = "0 0 1000 1000 1000 1000 1000 1000 1000"
+        f.write(bval)   
+    return bvals_gradtensor_file, bvecs_gradtensor_file
