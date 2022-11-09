@@ -19,12 +19,12 @@ source $abs_path/gradvenv/bin/activate
 
 # Prep inputs for gradtensor to b
 echo Preparing the inputs for gradnonlinearity correction
-python prep_inputs.py $org_bvec_file $org_bval_file $out_dir
+python $abs_path/prep_inputs.py $org_bvec_file $org_bval_file $out_dir
 
 
 # Run gradtensor to b #/usr/local/MATLAB/MATLAB_Runtime/v92 \
 echo Computing bimages with gradnonlinearity tensor
-/APPS/gradtensor/run_apply_gradtensor_to_b.sh \
+$abs_path/run_apply_gradtensor_to_b.sh \
 /usr/local/MATLAB/MATLAB_2017a_Runtime/v92 \
 Limg_file $L_file \
 refimg_file $dwi_file \
@@ -34,7 +34,7 @@ out_dir $out_dir || { echo 'apply_gradtensor_to_b failed' ; return 1; }
 
 # Run bimages to corrected signal
 echo Computing signal from bimages 
-python bimages_to_sig.py $dwi_file $org_bvec_file $org_bval_file $out_dir $num_threads
+python $abs_path/bimages_to_sig.py $dwi_file $org_bvec_file $org_bval_file $out_dir $num_threads
 
 # Done
 echo gradtensor.sh complete!
