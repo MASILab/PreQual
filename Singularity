@@ -75,6 +75,15 @@ From: ubuntu:18.04
     tar -C /APPS -xzvf /INSTALLERS/freesurfer-Linux-centos6_x86_64-stable-pub-v6.0.0.tar.gz
     echo "This is a dummy license file. Please bind your freesurfer license file to this file." > /APPS/freesurfer/license.txt
     cd /
+
+    # Download the Matlab Compiled Runtime installer, install, clean up
+    apt-get install -y wget unzip openjdk-8-jre libxt6
+    mkdir MCR
+    wget -nv -P /MCR http://ssd.mathworks.com/supportfiles/downloads/R2017a/deployment_files/R2017a/installers/glnxa64/MCR_R2017a_glnxa64_installer.zip
+    unzip -q /MCR/MCR_R2017a_glnxa64_installer.zip -d /MCR/MCR_R2017a_glnxa64_installer
+    /MCR/MCR_R2017a_glnxa64_installer/install -mode silent -agreeToLicense yes
+    rm -r /MCR/MCR_R2017a_glnxa64_installer /MCR/MCR_R2017a_glnxa64_installer.zip
+    rmdir /MCR
     
     # Make custom folders
     mkdir -p INPUTS
@@ -93,7 +102,8 @@ From: ubuntu:18.04
     cd /
     apt-get -y install wget git gcc libpq-dev python-dev python-pip python3 python3.8 python3.8-venv python3.8-dev python3-dev python3-pip python3-venv python3-wheel libpng-dev libfreetype6-dev libblas3 liblapack3 libblas-dev liblapack-dev pkg-config
     cd /INSTALLERS
-    git clone https://github.com/MASILab/PreQual.git
+    #git clone https://github.com/MASILab/PreQual.git
+    git clone -b pk https://github.com/praitayini/PreQual.git
     cd PreQual
     git checkout v1.0.8
     mv src/APPS/* /APPS
@@ -156,15 +166,6 @@ From: ubuntu:18.04
     export PATH="/usr/local/cuda/bin:$PATH"
     export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
     export CUDA_HOME="/usr/local/cuda"
-
-    # Download the Matlab Compiled Runtime installer, install, clean up
-    apt-get install -y wget unzip openjdk-8-jre libxt6
-    mkdir /MCR
-    wget -nv -P /MCR http://ssd.mathworks.com/supportfiles/downloads/R2017a/deployment_files/R2017a/installers/glnxa64/MCR_R2017a_glnxa64_installer.zip
-    unzip -q /MCR/MCR_R2017a_glnxa64_installer.zip -d /MCR/MCR_R2017a_glnxa64_installer
-    /MCR/MCR_R2017a_glnxa64_installer/install -mode silent -agreeToLicense yes
-    rm -r /MCR/MCR_R2017a_glnxa64_installer /MCR/MCR_R2017a_glnxa64_installer.zip
-    rmdir /MCR
 
 %runscript
 

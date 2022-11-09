@@ -485,7 +485,7 @@ def vis_grad(bvals_file, dwi_corr_file, grad_field_file, fa_grad_field_file, mas
     utils.plot_slice_contour(mask_slices, img_dim=0, offset_index=0, color='b')
     utils.plot_slice(slices=grad_field_slices, img_dim=0, offset_index=0, vox_dim=grad_field_vox_dim, img_min=grad_field_min, img_max=grad_field_max)
     plt.colorbar()
-    plt.title('Det. of Gradient Nonlinear Field', fontsize=SHARED_VARS.LABEL_FONTSIZE)
+    plt.title('Det. of \n Gradient Nonlinear Field', fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     plt.subplot(3, 3, 5)
     utils.plot_slice_contour(mask_slices, img_dim=0, offset_index=0, color='b')
@@ -500,7 +500,7 @@ def vis_grad(bvals_file, dwi_corr_file, grad_field_file, fa_grad_field_file, mas
     plt.subplot(3, 3, 3)
     utils.plot_slice(slices=fa_grad_field_slices, img_dim=0, offset_index=0, vox_dim=fa_grad_field_vox_dim, img_min=fa_grad_field_min, img_max=fa_grad_field_max)
     plt.colorbar()
-    plt.title('FA of Gradient Nonlinear Field', fontsize=SHARED_VARS.LABEL_FONTSIZE)
+    plt.title('FA of \n Gradient Nonlinear Field', fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     plt.subplot(3, 3, 6)
     utils.plot_slice(slices=fa_grad_field_slices, img_dim=1, offset_index=0, vox_dim=fa_grad_field_vox_dim, img_min=fa_grad_field_min, img_max=fa_grad_field_max)

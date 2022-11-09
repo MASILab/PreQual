@@ -712,11 +712,10 @@ def main():
     if params['use_grad']:
         gradtensor_file = os.path.join(in_dir, 'gradtensor.nii.gz')
         dwi_grad_corrected_file = preproc.gradtensor(gradtensor_file, dwi_preproc_file, bvecs_preproc_file, bvals_preproc_file, grad_nonlinear_dir, SHARED_VARS.NUM_THREADS)
-        # For visualization
+        # For visualization 
         resmaple_gradtensor_file = os.path.join(grad_nonlinear_dir,'L_resamp.nii.gz')
-        bvals_preproc_file, bvecs_preproc_file = utils.gradient_table_lr()
-        gradtensor_tensor_file, _ = preproc.tensor(resmaple_gradtensor_file, bvals_preproc_file, bvecs_preproc_file, mask_file, grad_nonlinear_dir)
-        gradtensor_fa_file, _, _, _, _ = preproc.scalars(gradtensor_tensor_file, mask_file, grad_nonlinear_dir)
+       #gradtensor_fa_file, _, _, _, _ = preproc.scalars(resmaple_gradtensor_file, mask_file, grad_nonlinear_dir)
+        gradtensor_fa_file = utils.compute_FA(resmaple_gradtensor_file)
 
     else:
 
