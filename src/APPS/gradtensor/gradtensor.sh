@@ -19,7 +19,7 @@ source $abs_path/gradvenv/bin/activate
 
 # Prep inputs for gradtensor to b
 echo Preparing the inputs for gradnonlinearity correction
-python $abs_path/prep_inputs.py $org_bvec_file $org_bval_file $out_dir
+python3.8 $abs_path/prep_inputs.py $org_bvec_file $org_bval_file $out_dir
 
 
 # Run gradtensor to b #/usr/local/MATLAB/MATLAB_Runtime/v92 \
