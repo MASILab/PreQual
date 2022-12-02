@@ -3,7 +3,7 @@ import numpy as np
 from dipy.io import read_bvals_bvecs
 
 
-print(sys.argv[1],sys.argv[2],sys.argv[3])
+print(sys.argv)
 og_file = sys.argv[1]
 ob_file = sys.argv[2]
 out_dir = sys.argv[3]

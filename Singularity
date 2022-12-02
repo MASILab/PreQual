@@ -19,22 +19,23 @@ From: ubuntu:18.04
     apt-get -y install ghostscript
 
     # Install MRTrix3
-    apt-get -y install git g++ python python-numpy libeigen3-dev zlib1g-dev libqt4-opengl-dev libgl1-mesa-dev libfftw3-dev libtiff5-dev python3-distutils
-    cd APPS
-    git clone https://github.com/MRtrix3/mrtrix3.git
-    cd mrtrix3
-    git checkout 3.0.3
-    ./configure
-    ./build
-    cd /
+    # apt-get -y install git g++ python python-numpy libeigen3-dev zlib1g-dev libqt4-opengl-dev libgl1-mesa-dev libfftw3-dev libtiff5-dev python3-distutils
+    # cd APPS
+    # git clone https://github.com/MRtrix3/mrtrix3.git
+    # cd mrtrix3
+    # git checkout 3.0.3
+    # ./configure
+    # ./build
+    # cd /
 
     # Install FSL
     apt-get -y install python wget ca-certificates libglu1-mesa libgl1-mesa-glx libsm6 libice6 libxt6 libpng16-16 libxrender1 libxcursor1 libxinerama1 libfreetype6 libxft2 libxrandr2 libgtk2.0-0 libpulse0 libasound2 libcaca0 libopenblas-base bzip2 dc bc 
     wget -O /INSTALLERS/fslinstaller.py "https://fsl.fmrib.ox.ac.uk/fsldownloads/fslinstaller.py"
+    # wget -O /INSTALLERS/fslinstaller.py "https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FslInstallation?action=AttachFile&do=get&target=fslinstaller.py"
     cd /INSTALLERS
-    python fslinstaller.py -d /APPS/fsl -V 6.0.4
+    python fslinstaller.py -d /APPS/fsl -V 6.0.6
     cd /
-
+    
     # Install Convert3D (stable build 1.0.0)
     apt-get -y install wget tar
     wget -O /INSTALLERS/c3d-1.0.0-Linux-x86_64.tar.gz "https://downloads.sourceforge.net/project/c3d/c3d/1.0.0/c3d-1.0.0-Linux-x86_64.tar.gz?r=https%3A%2F%2Fsourceforge.net%2Fprojects%2Fc3d%2Ffiles%2Fc3d%2F1.0.0%2Fc3d-1.0.0-Linux-x86_64.tar.gz%2Fdownload&ts=1571934949"
@@ -78,7 +79,7 @@ From: ubuntu:18.04
 
     # Download the Matlab Compiled Runtime installer, install, clean up
     apt-get install -y wget unzip openjdk-8-jre libxt6
-    mkdir /MCR
+    mkdir MCR
     wget -nv -P /MCR http://ssd.mathworks.com/supportfiles/downloads/R2017a/deployment_files/R2017a/installers/glnxa64/MCR_R2017a_glnxa64_installer.zip
     unzip -q /MCR/MCR_R2017a_glnxa64_installer.zip -d /MCR/MCR_R2017a_glnxa64_installer
     /MCR/MCR_R2017a_glnxa64_installer/install -mode silent -agreeToLicense yes

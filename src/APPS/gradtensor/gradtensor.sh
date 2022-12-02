@@ -26,7 +26,7 @@ python3.8 $abs_path/prep_inputs.py $org_bvec_file $org_bval_file $out_dir
 # Run gradtensor to b #/usr/local/MATLAB/MATLAB_Runtime/v92 \
 echo Computing bimages with gradnonlinearity tensor
 $abs_path/run_apply_gradtensor_to_b.sh \
-/usr/local/MATLAB/MATLAB_2017a_Runtime/v92 \
+/usr/local/MATLAB/MATLAB_Runtime/v92 \
 Limg_file $L_file \
 refimg_file $dwi_file \
 bval_file $out_dir/org.bval \
