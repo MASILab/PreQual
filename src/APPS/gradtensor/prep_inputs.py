@@ -4,9 +4,9 @@ from dipy.io import read_bvals_bvecs
 
 
 print(sys.argv)
-og_file = sys.argv[1]
-ob_file = sys.argv[2]
-out_dir = sys.argv[3]
+og_file = sys.argv[0]
+ob_file = sys.argv[1]
+out_dir = sys.argv[2]
 
 # Load the bvec and bval
 org_bval, org_bvec = read_bvals_bvecs(ob_file,og_file)

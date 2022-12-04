@@ -9,12 +9,12 @@ from dipy.io import read_bvals_bvecs
 from utils import reconstruct_signal_at_voxel, get_sh_order
 
 # Assign inputs
-n = nib.load(sys.argv[1]).get_fdata()
-vol = nib.load(sys.argv[1])
-og_file = sys.argv[2]
-ob_file = sys.argv[3]
-out_dir = sys.argv[4]
-num_cores = sys.argv[5]
+n = nib.load(sys.argv[0]).get_fdata()
+vol = nib.load(sys.argv[0])
+og_file = sys.argv[1]
+ob_file = sys.argv[2]
+out_dir = sys.argv[3]
+num_cores = sys.argv[4]
 
 # Load the voxelwise bvec and bvals
 bvec_vols = []
