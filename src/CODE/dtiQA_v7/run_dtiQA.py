@@ -719,7 +719,7 @@ def main():
 
     else:
 
-        print('SKIPPING BIAS FIELD CORRECTION')
+        print('SKIPPING NONLINEAR GRADIENT FIELD CORRECTION')
 
         dwi_grad_corrected_file = dwi_preproc_file
 
