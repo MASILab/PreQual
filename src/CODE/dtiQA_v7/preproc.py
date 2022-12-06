@@ -169,7 +169,7 @@ def gradtensor(gradtensor_file, dwi_preproc_file, bvecs_preproc_file, bvals_prep
 
     print('RUNNING GRADNONLIEARITY CORRECTION WITH {} ...'.format(gradtensor_file))
 
-    gradtensor_cmd = 'bash {} {} {} {} {}'.format(SHARED_VARS.GRADTENSOR_EXEC_FILE, gradtensor_file, dwi_preproc_file, bvecs_preproc_file, bvals_preproc_file, grad_nonlinear_dir, num_cores)
+    gradtensor_cmd = 'bash {} {} {} {} {} {} {}'.format(SHARED_VARS.GRADTENSOR_EXEC_FILE, gradtensor_file, dwi_preproc_file, bvecs_preproc_file, bvals_preproc_file, grad_nonlinear_dir, num_cores)
     utils.run_cmd(gradtensor_cmd)
 
     dwi_grad_corrected_file = os.path.join(grad_nonlinear_dir, 'Lcorrected_sig.nii.gz') # original output

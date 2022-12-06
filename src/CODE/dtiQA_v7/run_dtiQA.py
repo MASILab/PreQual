@@ -710,7 +710,7 @@ def main():
     grad_nonlinear_dir = utils.make_dir(out_dir, 'GRADNONLINEAR_CORRECTED')
 
     if params['use_grad']:
-        gradtensor_file = os.path.join(in_dir, 'gradtensor.nii.gz')
+        gradtensor_file = os.path.join(in_dir, 'gradtensor.nii')
         dwi_grad_corrected_file = preproc.gradtensor(gradtensor_file, dwi_preproc_file, bvecs_preproc_file, bvals_preproc_file, grad_nonlinear_dir, SHARED_VARS.NUM_THREADS)
         # For visualization 
         resmaple_gradtensor_file = os.path.join(grad_nonlinear_dir,'L_resamp.nii.gz')
