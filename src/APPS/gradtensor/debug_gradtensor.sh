@@ -1,12 +1,12 @@
 #!/bin/bash
 
-L_file=/INPUTS/L.nii.gz
-dwi_file=/INPUTS/dti.nii.gz
-org_bvec_file=/INPUTS/bvec.txt
-org_bval_file=/INPUTS/bval.txt
+L_file=/INPUTS/L.nii
+dwi_file=/INPUTS/dti1.nii.gz
+org_bvec_file=/INPUTS/dti1.bvec
+org_bval_file=/INPUTS/dti1.bval
 out_dir=/OUTPUTS
 # num_threads=
-
+echo lala
 echo $L_file $dwi_file $org_bval_file $org_bvec_file $out_dir
 # Set absolute path variable for our custom executables
 abs_path=/APPS/gradtensor # Change in container to /APPS/gradtensor
@@ -24,7 +24,7 @@ abs_path=/APPS/gradtensor # Change in container to /APPS/gradtensor
 
 # Run gradtensor to b #/usr/local/MATLAB/MATLAB_Runtime/v92 \
 echo Computing bimages with gradnonlinearity tensor
-$abs_path/run_apply_gradtensor_to_b.sh \
+sh $abs_path/run_apply_gradtensor_to_b.sh \
 /usr/local/MATLAB/MATLAB_Runtime/v92 \
 Limg_file $L_file \
 refimg_file $dwi_file \
