@@ -943,7 +943,7 @@ def compute_FA(resmaple_gradtensor_file):
         for j in range(LR_mat.shape[1]):
             for k in range(LR_mat.shape[2]):
                 r = np.reshape(LR_mat[i,j,k,:],[3,3])
-                w, _ = np.linalg.LA.eig(r)
+                w, _ = np.linalg.eig(r)
                 eig_vol[i,j,k,:] = w
 
     ev1 = eig_vol[:,:,:,0]
