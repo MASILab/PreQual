@@ -752,10 +752,11 @@ def pescheme2axis(pe_axis, pe_dir, aff):
 
 def slice_nii(nii_file, offsets=[0], custom_aff=[], min_percentile=0, max_percentile=100, min_intensity=np.nan, max_intensity=np.nan, det=False):
 
-    img, aff, hdr = load_nii(nii_file, ndim=3)
     if det:
+        img, aff, hdr = load_nii(nii_file, ndim=4)
         img = det_matrix(img)
-
+    else:
+        img, aff, hdr = load_nii(nii_file, ndim=3)
     # Extract voxel dimensions and reorient image in radiological view
 
     vox_dim = hdr.get_zooms()
