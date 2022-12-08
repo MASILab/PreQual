@@ -750,9 +750,11 @@ def pescheme2axis(pe_axis, pe_dir, aff):
 
 # Function Definitions: Visualization
 
-def slice_nii(nii_file, offsets=[0], custom_aff=[], min_percentile=0, max_percentile=100, min_intensity=np.nan, max_intensity=np.nan):
+def slice_nii(nii_file, offsets=[0], custom_aff=[], min_percentile=0, max_percentile=100, min_intensity=np.nan, max_intensity=np.nan, det=False):
 
     img, aff, hdr = load_nii(nii_file, ndim=3)
+    if det:
+        img = det_matrix(img)
 
     # Extract voxel dimensions and reorient image in radiological view
 
@@ -952,3 +954,28 @@ def compute_FA(resmaple_gradtensor_file):
     FA = np.sqrt(0.5) * ( np.sqrt ((ev1 - ev2) ** 2 + (ev2 - ev3) ** 2 + (ev3 - ev1) ** 2) / (np.sqrt (ev1 **2) + (ev2 **2) + (ev3 **2)))
     fa_img = nib.Nifti1Image(FA.astype(np.float32), affine)
     return fa_img
+
+def det_matrix(l):
+        x_dim = l.shape[0]
+        y_dim = l.shape[1]
+        z_dim = l.shape[2]
+        vL = np.zeros((3,3,x_dim,y_dim,z_dim))
+        vL[0,0,:,:,:] = l[:,:,:,0]
+        vL[0,1,:,:,:] = l[:,:,:,1]
+        vL[0,2,:,:,:] = l[:,:,:,2]
+        vL[1,0,:,:,:] = l[:,:,:,3]
+        vL[1,1,:,:,:] = l[:,:,:,4]
+        vL[1,2,:,:,:] = l[:,:,:,5]
+        vL[2,0,:,:,:] = l[:,:,:,6]
+        vL[2,1,:,:,:] = l[:,:,:,7]
+        vL[2,2,:,:,:] = l[:,:,:,8]
+
+        L_det = np.zeros((x_dim,y_dim,z_dim))
+
+        # Along all axis obtain the determinant of LR matrix
+        for x in range(x_dim):
+                for y in range(y_dim):
+                        for z in range(z_dim):
+                                L_mat = np.squeeze(vL[:,:,x,y,z])
+                                L_det[x,y,z] = np.linalg.det(L_mat[:,:])
+        return L_det

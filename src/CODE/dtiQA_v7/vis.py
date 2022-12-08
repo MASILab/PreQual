@@ -457,7 +457,7 @@ def vis_grad(bvals_file, dwi_corr_file, grad_field_file, fa_grad_field_file, mas
     b0_corr_slices, b0_corr_vox_dim, b0_corr_min, b0_corr_max = utils.slice_nii(b0_corr_file, min_intensity=0, max_percentile=90)
 
     mask_slices, _, _, _ = utils.slice_nii(mask_file)
-    grad_field_slices, grad_field_vox_dim, grad_field_min, grad_field_max = utils.slice_grad_nii(grad_field_file)
+    grad_field_slices, grad_field_vox_dim, grad_field_min, grad_field_max = utils.slice_nii(grad_field_file, det=True)
     fa_grad_field_slices, fa_grad_field_vox_dim, fa_grad_field_min, fa_grad_field_max = utils.slice_nii(fa_grad_field_file)
 
     plt.figure(0, figsize=SHARED_VARS.PAGESIZE)
