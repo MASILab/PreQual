@@ -488,12 +488,12 @@ def vis_grad(bvals_file, dwi_corr_file, grad_field_file, fa_grad_field_file, mas
     plt.title('Det. of \n Gradient Nonlinear Field', fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     plt.subplot(3, 3, 5)
-    utils.plot_slice_contour(mask_slices, img_dim=0, offset_index=0, color='b')
+    utils.plot_slice_contour(mask_slices, img_dim=1, offset_index=0, color='b')
     utils.plot_slice(slices=grad_field_slices, img_dim=1, offset_index=0, vox_dim=grad_field_vox_dim, img_min=grad_field_min, img_max=grad_field_max)
     plt.colorbar()
 
     plt.subplot(3, 3, 8)
-    utils.plot_slice_contour(mask_slices, img_dim=0, offset_index=0, color='b')
+    utils.plot_slice_contour(mask_slices, img_dim=2, offset_index=0, color='b')
     utils.plot_slice(slices=grad_field_slices, img_dim=2, offset_index=0, vox_dim=grad_field_vox_dim, img_min=grad_field_min, img_max=grad_field_max)
     plt.colorbar()
 
@@ -513,7 +513,7 @@ def vis_grad(bvals_file, dwi_corr_file, grad_field_file, fa_grad_field_file, mas
     plt.tight_layout()
 
     plt.subplots_adjust(top=0.925)
-    plt.suptitle('N4 Bias Field Correction', fontsize=SHARED_VARS.TITLE_FONTSIZE)
+    plt.suptitle('Nonlinear Gradient Field Correction', fontsize=SHARED_VARS.TITLE_FONTSIZE)
 
     grad_vis_file = os.path.join(vis_dir, 'grad.pdf')
     plt.savefig(grad_vis_file, dpi=SHARED_VARS.PDF_DPI)
