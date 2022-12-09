@@ -714,8 +714,8 @@ def main():
         dwi_grad_corrected_file = preproc.gradtensor(gradtensor_file, dwi_preproc_file, bvecs_preproc_file, bvals_preproc_file, grad_nonlinear_dir, SHARED_VARS.NUM_THREADS)
         # For visualization 
         resmaple_gradtensor_file = os.path.join(grad_nonlinear_dir,'L_resamp.nii.gz')
-       #gradtensor_fa_file, _, _, _, _ = preproc.scalars(resmaple_gradtensor_file, mask_file, grad_nonlinear_dir)
-        gradtensor_fa_file = utils.compute_FA(resmaple_gradtensor_file)
+        gradtensor_fa_file = os.path.join(grad_nonlinear_dir, 'gradtensor_fa.nii.gz')
+        utils.compute_FA(resmaple_gradtensor_file, gradtensor_fa_file)
 
     else:
 
