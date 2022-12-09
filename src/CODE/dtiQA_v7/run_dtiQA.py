@@ -723,8 +723,8 @@ def main():
 
         dwi_grad_corrected_file = dwi_preproc_file
 
-    bvals_grad_corrected_file = bvals_unbiased_file
-    bvecs_grad_corrected_file = bvecs_unbiased_file
+    bvals_grad_corrected_file = bvals_preproc_file
+    bvecs_grad_corrected_file = bvecs_preproc_file
 
     tf = time.time()
     dt = round(tf - ti)

@@ -936,7 +936,7 @@ def _unique_prefixes(volume_prefixes):
     unique_volume_prefixes = volume_prefixes[unique_volume_prefix_indices]
     return unique_volume_prefixes
 
-def compute_FA(resmaple_gradtensor_file):
+def compute_FA(resmaple_gradtensor_file, gradtensor_fa_file):
     
     img = nib.load(resmaple_gradtensor_file)
     affine = img.affine
@@ -954,7 +954,7 @@ def compute_FA(resmaple_gradtensor_file):
     ev3 = eig_vol[:,:,:,2]
     FA = np.sqrt(0.5) * ( np.sqrt ((ev1 - ev2) ** 2 + (ev2 - ev3) ** 2 + (ev3 - ev1) ** 2) / (np.sqrt (ev1 **2) + (ev2 **2) + (ev3 **2)))
     fa_img = nib.Nifti1Image(FA.astype(np.float32), affine)
-    return fa_img
+    nib.save(fa_img, gradtensor_fa_file)
 
 def det_matrix(l):
         x_dim = l.shape[0]
