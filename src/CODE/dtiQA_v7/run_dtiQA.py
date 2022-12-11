@@ -841,7 +841,7 @@ def main():
     if params['use_unbias']:
         bias_vis_file = vis.vis_bias(dwi_norm_file, bvals_norm_file, dwi_unbiased_file, bias_field_file, vis_dir)
     if params['use_grad']:
-        grad_vis_file = vis.vis_grad(bvals_unbiased_file, dwi_grad_corrected_file, resmaple_gradtensor_file, gradtensor_fa_file, mask_file, vis_dir)
+        grad_vis_file = vis.vis_grad(bvals_unbiased_file, bvals_preproc_shelled, dwi_grad_corrected_file, resmaple_gradtensor_file, gradtensor_fa_file, mask_file, vis_dir)
     dwi_vis_files = vis.vis_dwi(dwi_preproc_file, bvals_preproc_shelled, bvecs_preproc_file, cnr_dict, vis_dir)
     glyph_vis_file = vis.vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_type=params['glyph_type'])
     fa_vis_file = vis.vis_scalar(fa_file, vis_dir, name='FA', comment='White matter should be bright')

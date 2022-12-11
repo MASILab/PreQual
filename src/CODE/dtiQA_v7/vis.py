@@ -447,14 +447,15 @@ def vis_bias(dwi_file, bvals_file, dwi_unbiased_file, bias_field_file, vis_dir):
     return bias_vis_file
 
 
-def vis_grad(bvals_file, dwi_corr_file, grad_field_file, fa_grad_field_file, mask_file, vis_dir):
+def vis_grad(bvals_file, shells, dwi_corr_file, grad_field_file, fa_grad_field_file, mask_file, vis_dir):
 
     temp_dir = utils.make_dir(vis_dir, 'TEMP')
 
     print('VISUALIZING GRADIENT NONLINEAR FIELD CORRECTION')
-
-    b0_corr_file, _, _ = utils.dwi_extract(dwi_corr_file, bvals_file, temp_dir, target_bval=1000, first_only=True)
-    b0_corr_slices, b0_corr_vox_dim, b0_corr_min, b0_corr_max = utils.slice_nii(b0_corr_file, min_intensity=0, max_percentile=90)
+    shells = np.unique(shells)
+    bval = np.nonzero(shells)[0][1]
+    b0_corr_file, _, _ = utils.dwi_extract(dwi_corr_file, bvals_file, temp_dir, target_bval=bval, first_only=True)
+    b0_corr_slices, b0_corr_vox_dim, b0_corr_min, b0_corr_max = utils.slice_nii(b0_corr_file, min_intensity=0, max_percentile=SHARED_VARS.VIS_PERCENTILE_MAX)
 
     mask_slices, _, _, _ = utils.slice_nii(mask_file)
     grad_field_slices, grad_field_vox_dim, grad_field_min, grad_field_max = utils.slice_nii(grad_field_file, det=True)
@@ -466,7 +467,7 @@ def vis_grad(bvals_file, dwi_corr_file, grad_field_file, fa_grad_field_file, mas
     utils.plot_slice_contour(mask_slices, img_dim=0, offset_index=0, color='b')
     utils.plot_slice(slices=b0_corr_slices, img_dim=0, offset_index=0, vox_dim=b0_corr_vox_dim, img_min=b0_corr_min, img_max=b0_corr_max)
     plt.colorbar()
-    plt.title('Corrected', fontsize=SHARED_VARS.LABEL_FONTSIZE)
+    plt.title('Corrected b = ' + bval, fontsize=SHARED_VARS.LABEL_FONTSIZE)
     plt.ylabel('Sagittal', fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     plt.subplot(3, 3, 4)
