@@ -453,7 +453,9 @@ def vis_grad(bvals_file, shells, dwi_corr_file, grad_field_file, fa_grad_field_f
 
     print('VISUALIZING GRADIENT NONLINEAR FIELD CORRECTION')
     shells = np.unique(shells)
-    bval = np.nonzero(shells)[0][1]
+    print(shells)
+    bval = shells[shells != 0][0]
+    print(bval)
     b0_corr_file, _, _ = utils.dwi_extract(dwi_corr_file, bvals_file, temp_dir, target_bval=bval, first_only=True)
     b0_corr_slices, b0_corr_vox_dim, b0_corr_min, b0_corr_max = utils.slice_nii(b0_corr_file, min_intensity=0, max_percentile=SHARED_VARS.VIS_PERCENTILE_MAX)
 
