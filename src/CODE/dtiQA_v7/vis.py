@@ -469,7 +469,7 @@ def vis_grad(bvals_file, shells, dwi_corr_file, grad_field_file, fa_grad_field_f
     utils.plot_slice_contour(mask_slices, img_dim=0, offset_index=0, color='b')
     utils.plot_slice(slices=b0_corr_slices, img_dim=0, offset_index=0, vox_dim=b0_corr_vox_dim, img_min=b0_corr_min, img_max=b0_corr_max)
     plt.colorbar()
-    plt.title('Corrected b = ' + bval, fontsize=SHARED_VARS.LABEL_FONTSIZE)
+    plt.title('Corrected b = ' + str(bval), fontsize=SHARED_VARS.LABEL_FONTSIZE)
     plt.ylabel('Sagittal', fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     plt.subplot(3, 3, 4)
