@@ -13,6 +13,7 @@ export PATH=$PATH:$abs_path
 
 ## Set up freesurfer
 #export FREESURFER_HOME=$abs_path/freesurfer # this line is executed in singularity environment set up
+export FS_LICENSE=/APPS/freesurfer/license.txt
 source $FREESURFER_HOME/SetUpFreeSurfer.sh # can't do this with singularity env set up because singularity uses sh and source and the setup file need bash, so need to do it before we need freesurfer, which for dtiQA is just here
 
 # Set up pytorch
