@@ -223,7 +223,7 @@ def eddy(eddy_input_dwi_file, eddy_input_bvals_file, eddy_input_bvecs_file, eddy
     elif eddy_cuda_version == 9.1:
         eddy_exec = 'eddy_cuda9.1'
     else:
-        eddy_exec = 'eddy_cpu'
+        eddy_exec = 'eddy_openmp'
 
     # Set outputs
 
