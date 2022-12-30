@@ -80,6 +80,7 @@ Alternatively, a pre-built container can be downloaded [here](https://masi.vuse.
     singularity run 
     -e 
     --contain
+    --home /path/to/inputs/directory/
     -B /path/to/inputs/directory/:/INPUTS
     -B /path/to/outputs/directory/:/OUTPUTS
     -B /tmp:/tmp
@@ -92,6 +93,7 @@ Alternatively, a pre-built container can be downloaded [here](https://masi.vuse.
     
 * Binding the freesurfer license is optional and only needed for Synb0-DisCo
 * Binding the tmp directory is necessary when running the image with `--contain`.
+* Binding --home is necessary for matlab since it uses home for temp storage. 
 * `--nv` and `-B /path/to/cuda:/usr/local/cuda` are optional. See options `--eddy_cuda` and `--eddy_extra_args`. **GPU support is currently experimental.**
 
 ## Arguments and I/O
