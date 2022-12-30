@@ -1,5 +1,5 @@
 # PreQual: Shared Variables
-# Leon Cai and Qi Yang
+# Leon Cai, Qi Yang, and Praitayini Kanakaraj
 # MASI Lab
 # Vanderbilt University
 
