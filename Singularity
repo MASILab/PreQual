@@ -30,10 +30,10 @@ From: ubuntu:18.04
 
     # Install FSL
     apt-get -y install python wget ca-certificates libglu1-mesa libgl1-mesa-glx libsm6 libice6 libxt6 libpng16-16 libxrender1 libxcursor1 libxinerama1 libfreetype6 libxft2 libxrandr2 libgtk2.0-0 libpulse0 libasound2 libcaca0 libopenblas-base bzip2 dc bc 
-    wget -O /INSTALLERS/fslinstaller.py "https://fsl.fmrib.ox.ac.uk/fsldownloads/fslinstaller.py"
-    # wget -O /INSTALLERS/fslinstaller.py "https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FslInstallation?action=AttachFile&do=get&target=fslinstaller.py"
+    #wget -O /INSTALLERS/fslinstaller.py "https://fsl.fmrib.ox.ac.uk/fsldownloads/fslinstaller.py"
+    wget -O /INSTALLERS/fslinstaller.py "https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FslInstallation?action=AttachFile&do=get&target=fslinstaller.py"
     cd /INSTALLERS
-    python fslinstaller.py -d /APPS/fsl -V 6.0.6
+    python fslinstaller.py -d /APPS/fsl -V 6.0.4
     cd /
     
     # Install Convert3D (stable build 1.0.0)
