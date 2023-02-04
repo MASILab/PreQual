@@ -317,7 +317,7 @@ Default = off
 
 **--correct\_grad on/off**
 
-Perform gradient nonlinearity correction. First, corrected voxelwise b-table is calculated as in [https://github.com/baxpr/gradtensor]. These results are used to computed the corrected diffusion weighted signal. If this option is on, the determinant nonlinear gradient field will be visualized in the output PDF.
+Perform gradient nonlinearity correction. First, corrected voxelwise b-table is calculated as in [https://github.com/baxpr/gradtensor]. These results are used to compute the corrected diffusion weighted signal. If this option is on, the determinant nonlinear gradient field will be visualized in the output PDF.
 
 Default = off
 
