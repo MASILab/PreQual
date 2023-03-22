@@ -34,6 +34,7 @@
     1. Inter-volume motion correction
     1. Slice-wise signal dropout imputation
     1. N4 B1 bias field correction (default off)
+    1. Gradient nonlinearity correction (default off)
 
 * **Quality Assurance Steps:** 
     1. Verification of phase encoding schemes
@@ -45,6 +46,7 @@
     1. Shell-wise analysis of distortion corrections
     1. Analysis of inter-volume motion and slice-wise signal dropout
     1. Analysis of B1 bias fields (if applicable)
+    1. Analysis of gradient nonlinear fields (if applicable)
     1. Verification of intra-pipeline masking
     1. Analysis of tensor goodness-of-fit
     1. Voxel-wise and region-wise quantification of FA
@@ -78,6 +80,7 @@ Alternatively, a pre-built container can be downloaded [here](https://masi.vuse.
     singularity run 
     -e 
     --contain
+    --home /path/to/inputs/directory/
     -B /path/to/inputs/directory/:/INPUTS
     -B /path/to/outputs/directory/:/OUTPUTS
     -B /tmp:/tmp
@@ -90,6 +93,7 @@ Alternatively, a pre-built container can be downloaded [here](https://masi.vuse.
     
 * Binding the freesurfer license is optional and only needed for Synb0-DisCo
 * Binding the tmp directory is necessary when running the image with `--contain`.
+* Binding --home is necessary for matlab since it uses home for temp storage. 
 * `--nv` and `-B /path/to/cuda:/usr/local/cuda` are optional. See options `--eddy_cuda` and `--eddy_extra_args`. **GPU support is currently experimental.**
 
 ## Arguments and I/O
@@ -113,6 +117,8 @@ Alternatively, a pre-built container can be downloaded [here](https://masi.vuse.
   * \<imageN\>.bvec (normalized unit vectors in the [FSL format](https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FDT/UserGuide#Diffusion\_data\_in\_FSL))
 
   * t1.nii.gz (Optional, used for Synb0-DisCo, must be named exactly)
+  
+  * gradtensor.nii (Optional, used for --correct_grad, must be named exactly)
 
   * Other files as needed (see `--extra_eddy_args` for more information)
 
@@ -309,6 +315,12 @@ Perform [ANTs N4 bias field correction](https://manpages.debian.org/testing/ants
 
 Default = off
 
+**--correct\_grad on/off**
+
+Perform gradient nonlinearity correction. First, corrected voxelwise b-table is calculated as in [https://github.com/baxpr/gradtensor]. These results are used to compute the corrected diffusion weighted signal. If this option is on, the determinant nonlinear gradient field will be visualized in the output PDF.
+
+Default = off
+
 **--improbable_mask on/off**
 
 Create an additional mask on the preprocessed data that omits voxels where the minimum b0 signal is smaller than the minimum diffusion weighted signal. This can be helpful for reducing artifacts near the mask border when fitting models.
@@ -462,6 +474,8 @@ Default = sess
 1. We generate a brain mask using FSL’s bet2 with the following options. If applicable, we omit the voxels where the minimum b0 signal is less than the minimum diffusion weighted signal in an additional "improbable mask".
 
     `-f 0.25 -R`
+    
+1. If the user chooses to, we then perform gradient nonliear field correction by first calculating the voxel-wise b-table and then corrected diffusion weighted signal.
 
 1. We then apply the mask to the preprocessed images while we calculate tensors using MRTrix3’s dwi2tensor function. For visualization we discard tensors that have diagonal elements greater than 3 times the apparent diffusion coefficient of water at 37°C (~0.01).
 
@@ -510,6 +524,8 @@ Default = sess
    1. We then plot the original raw b-vectors scaled by their b-values, the preprocessed ones output by eddy, and the optimized ones determined by `dwigradcheck` applied to the preprocessed ones.
 
    1. If bias field correction was performed, we then visualize the calculated fields.
+   
+   1. If bias field correction was performed, we then visualize the calculated image and gradient fields.
 
    1. We then visualize some central slices of the average volumes for all unique b-values, including b = 0 and report the median intra-mask SNR or CNR calculated by eddy as appropriate. If there are more unique b-values than shells deteremined by eddy, we round the b-values to the nearest 100 by default to assign volumes to shells or we choose the nearest shell indicated by the user (see `--nonzero_shells`).
 
@@ -676,6 +692,31 @@ Folders and files in *italics* are removed if `--keep_intermediates` is NOT indi
     * *normed\_unbiased.nii.gz* (if postnormalization is run) or *preproc\_input\_eddyed\_unbiased.nii.gz* (if postnormalization is not run)
 
     * bias\_field.nii.gz
+    
+
+1. *UNBIASED* (these files are only created if `--correct_grad` is on; this folder is removed if `--correct_grad` is off)
+
+    * corrected_sig.nii.gz
+
+    * gradtensor_fa.nii.gz
+    
+    * L_resamp.nii.gz
+    
+    * org.bval
+    
+    * org.bvec
+    
+    * \<bval_1\>\.nii.gz
+
+        :
+
+    * \<bval_N\>\.nii.gz
+    
+    * \<bvec_1\>\.nii.gz
+
+        :
+
+    * \<bvec_N\>\.nii.gz
 
 1. **PREPROCESSED** (these represent the final output of the pipeline)
 

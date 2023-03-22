@@ -1,5 +1,5 @@
 # PreQual: Visualization
-# Leon Cai and Qi Yang
+# Leon Cai, Qi Yang, and Praitayini Kanakaraj
 # MASI Lab
 # Vanderbilt University
 
@@ -55,6 +55,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
         '- Extra Eddy Args: {}\n'
         '- Run Postnormalize: {}\n'
         '- Run N4 Bias Field Correction: {}\n'
+        '- Run Gradient Nonlinearity Correction: {}\n'
         '- Mask Improbable Voxels: {}\n'
         '- Glyph Visualization Type: {}\n'
         '- Atlas Registration Type: {}\n'
@@ -74,6 +75,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
                 params['extra_eddy_args'],
                 params['use_postnormalize'],
                 params['use_unbias'],
+                params['use_grad'],
                 params['improbable_mask'],
                 params['glyph_type'],
                 params['atlas_reg_type'],
@@ -443,6 +445,87 @@ def vis_bias(dwi_file, bvals_file, dwi_unbiased_file, bias_field_file, vis_dir):
     utils.remove_dir(temp_dir)
 
     return bias_vis_file
+
+
+def vis_grad(bvals_file, shells, dwi_corr_file, grad_field_file, fa_grad_field_file, mask_file, vis_dir):
+
+    temp_dir = utils.make_dir(vis_dir, 'TEMP')
+
+    print('VISUALIZING GRADIENT NONLINEAR FIELD CORRECTION')
+    shells = np.unique(shells)
+    print(shells)
+    bval = shells[shells != 0][0]
+    print(bval)
+    b0_corr_file, _, _ = utils.dwi_extract(dwi_corr_file, bvals_file, temp_dir, target_bval=bval, first_only=True)
+    b0_corr_slices, b0_corr_vox_dim, b0_corr_min, b0_corr_max = utils.slice_nii(b0_corr_file, min_intensity=0, max_percentile=SHARED_VARS.VIS_PERCENTILE_MAX)
+
+    mask_slices, _, _, _ = utils.slice_nii(mask_file)
+    grad_field_slices, grad_field_vox_dim, grad_field_min, grad_field_max = utils.slice_nii(grad_field_file, det=True)
+    fa_grad_field_slices, fa_grad_field_vox_dim, fa_grad_field_min, fa_grad_field_max = utils.slice_nii(fa_grad_field_file)
+
+    plt.figure(0, figsize=SHARED_VARS.PAGESIZE)
+
+    plt.subplot(3, 3, 1)
+    utils.plot_slice_contour(mask_slices, img_dim=0, offset_index=0, color='b')
+    utils.plot_slice(slices=b0_corr_slices, img_dim=0, offset_index=0, vox_dim=b0_corr_vox_dim, img_min=b0_corr_min, img_max=b0_corr_max)
+    plt.colorbar()
+    plt.title('Corrected b = ' + str(bval), fontsize=SHARED_VARS.LABEL_FONTSIZE)
+    plt.ylabel('Sagittal', fontsize=SHARED_VARS.LABEL_FONTSIZE)
+
+    plt.subplot(3, 3, 4)
+    utils.plot_slice_contour(mask_slices, img_dim=1, offset_index=0, color='b')
+    utils.plot_slice(slices=b0_corr_slices, img_dim=1, offset_index=0, vox_dim=b0_corr_vox_dim, img_min=b0_corr_min, img_max=b0_corr_max)
+    plt.colorbar()
+    plt.ylabel('Coronal', fontsize=SHARED_VARS.LABEL_FONTSIZE)
+
+    plt.subplot(3, 3, 7)
+    utils.plot_slice_contour(mask_slices, img_dim=2, offset_index=0, color='b')
+    utils.plot_slice(slices=b0_corr_slices, img_dim=2, offset_index=0, vox_dim=b0_corr_vox_dim, img_min=b0_corr_min, img_max=b0_corr_max)
+    plt.colorbar()
+    plt.ylabel('Axial', fontsize=SHARED_VARS.LABEL_FONTSIZE)
+
+    plt.subplot(3, 3, 2)
+    utils.plot_slice_contour(mask_slices, img_dim=0, offset_index=0, color='b')
+    utils.plot_slice(slices=grad_field_slices, img_dim=0, offset_index=0, vox_dim=grad_field_vox_dim, img_min=grad_field_min, img_max=grad_field_max)
+    plt.colorbar()
+    plt.title('Det. of \n Gradient Nonlinear Field', fontsize=SHARED_VARS.LABEL_FONTSIZE)
+
+    plt.subplot(3, 3, 5)
+    utils.plot_slice_contour(mask_slices, img_dim=1, offset_index=0, color='b')
+    utils.plot_slice(slices=grad_field_slices, img_dim=1, offset_index=0, vox_dim=grad_field_vox_dim, img_min=grad_field_min, img_max=grad_field_max)
+    plt.colorbar()
+
+    plt.subplot(3, 3, 8)
+    utils.plot_slice_contour(mask_slices, img_dim=2, offset_index=0, color='b')
+    utils.plot_slice(slices=grad_field_slices, img_dim=2, offset_index=0, vox_dim=grad_field_vox_dim, img_min=grad_field_min, img_max=grad_field_max)
+    plt.colorbar()
+
+    plt.subplot(3, 3, 3)
+    utils.plot_slice(slices=fa_grad_field_slices, img_dim=0, offset_index=0, vox_dim=fa_grad_field_vox_dim, img_min=fa_grad_field_min, img_max=fa_grad_field_max)
+    plt.colorbar()
+    plt.title('FA of \n Gradient Nonlinear Field', fontsize=SHARED_VARS.LABEL_FONTSIZE)
+
+    plt.subplot(3, 3, 6)
+    utils.plot_slice(slices=fa_grad_field_slices, img_dim=1, offset_index=0, vox_dim=fa_grad_field_vox_dim, img_min=fa_grad_field_min, img_max=fa_grad_field_max)
+    plt.colorbar()
+
+    plt.subplot(3, 3, 9)
+    utils.plot_slice(slices=fa_grad_field_slices, img_dim=2, offset_index=0, vox_dim=fa_grad_field_vox_dim, img_min=fa_grad_field_min, img_max=fa_grad_field_max)
+    plt.colorbar()
+
+    plt.tight_layout()
+
+    plt.subplots_adjust(top=0.925)
+    plt.suptitle('Nonlinear Gradient Field Correction', fontsize=SHARED_VARS.TITLE_FONTSIZE)
+
+    grad_vis_file = os.path.join(vis_dir, 'grad.pdf')
+    plt.savefig(grad_vis_file, dpi=SHARED_VARS.PDF_DPI)
+    plt.close()
+
+    utils.remove_dir(temp_dir)
+
+    return grad_vis_file
+
 
 def vis_degibbs(dwi_files, bvals_files, dwi_degibbs_files, gains, vis_dir):
 

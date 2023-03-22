@@ -1,5 +1,5 @@
 # PreQual
-# Leon Cai and Qi Yang
+# Leon Cai, Qi Yang, and Praitayini Kanakaraj
 # MASI Lab
 # Vanderbilt University
 
@@ -48,6 +48,7 @@ def main():
     parser.add_argument('--atlas_reg_type', metavar='FA/b0', default='FA', help='Register to the JHU atlas by using the subject FA map or the subject average preprocessed b0 (default = FA)')
     parser.add_argument('--split_outputs', action='store_true', help='Split preprocessed output to match structure of input files (default = do NOT split)')
     parser.add_argument('--keep_intermediates', action='store_true', help='Keep intermediate copies of data (default = do NOT keep)')
+    parser.add_argument('--correct_grad', metavar='on/off', default='off', help='Perform gradient nonlinearity correction and a gradient tensor should be supplied (default = off)')
     parser.add_argument('--num_threads', metavar='N', default=1, help='Non-negative integer indicating number of threads to use when running multi-threaded steps of this pipeline (default = 1)')
     parser.add_argument('--project', metavar='string', default='proj', help='Project ID (default = proj)')
     parser.add_argument('--subject', metavar='string', default='subj', help='Subject ID (default = subj)')
@@ -188,6 +189,13 @@ def main():
     else:
         raise utils.DTIQAError('INVALID INPUT FOR --correct_bias PARAMETER. EXITING.')
 
+    if args.correct_grad == 'on':
+        params['use_grad'] = True
+    elif args.correct_grad == 'off':
+        params['use_grad'] = False
+    else:
+        raise utils.DTIQAError('INVALID INPUT FOR --correct_grad PARAMETER. EXITING.')
+
     if args.improbable_mask == 'on':
         params['improbable_mask'] = True
     elif args.improbable_mask == 'off':
@@ -213,7 +221,7 @@ def main():
         SHARED_VARS.NUM_THREADS = int(num_threads)
     else:
         raise utils.DTIQAError('INVALID INPUT FOR --num_threads PARAMETER. EXITING.')
-
+        
     params['project'] = args.project
     params['subject'] = args.subject
     params['session'] = args.session
@@ -269,6 +277,7 @@ def main():
     print('- Extra Eddy Args: {}'.format(params['extra_eddy_args']))
     print('- Postnormalize: {}'.format(params['use_postnormalize']))
     print('- N4 Bias Correction: {}'.format(params['use_unbias']))
+    print('- Nonlinear Gradient Correction: {}'.format(params['use_grad']))
     print('- Improbable Mask: {}'.format(params['improbable_mask']))
     print('- Glyph Visualization: {}'.format(params['glyph_type']))
     print('- Atlas Registration: {}'.format(params['atlas_reg_type']))
@@ -641,6 +650,39 @@ def main():
     print('*** DTIQA V7: BIAS FIELD CORRECTED ({:05d}s) ***'.format(dt))
     print('************************************************\n')
 
+    # PERFORM GRADIENT NONLINEARITY CORRECTION
+ 
+    print('**************************************************')
+    print('*** DTIQA V7: CORRECTING GRADIENT NONLINEARITY ***')
+    print('**************************************************')
+
+    ti = time.time()
+    
+    if params['use_grad']:
+        grad_nonlinear_dir = utils.make_dir(out_dir, 'GRADNONLINEAR_CORRECTED')
+        gradtensor_file = os.path.join(in_dir, 'gradtensor.nii')
+        dwi_grad_corrected_file = preproc.gradtensor(gradtensor_file, dwi_unbiased_file, bvecs_unbiased_file, bvals_unbiased_file, grad_nonlinear_dir, SHARED_VARS.NUM_THREADS)
+        # For visualization 
+        resmaple_gradtensor_file = os.path.join(grad_nonlinear_dir,'L_resamp.nii.gz')
+        gradtensor_fa_file = os.path.join(grad_nonlinear_dir, 'gradtensor_fa.nii.gz')
+        utils.compute_FA(resmaple_gradtensor_file, gradtensor_fa_file)
+
+    else:
+
+        print('SKIPPING NONLINEAR GRADIENT FIELD CORRECTION')
+
+        dwi_grad_corrected_file = dwi_unbiased_file
+
+    bvals_grad_corrected_file = bvals_unbiased_file
+    bvecs_grad_corrected_file = bvecs_unbiased_file
+
+    tf = time.time()
+    dt = round(tf - ti)
+
+    print('***********************************************')
+    print('*** DTIQA V7: GRADIENT NONLINEARITY CORRECTED ({:05d}s) ***'.format(dt))
+    print('***********************************************\n')
+
     # FORMALIZE OUTPUTS IN PREPROCESSED FOLDER
 
     print('*************************************')
@@ -656,9 +698,9 @@ def main():
     bvals_preproc_file = os.path.join(preproc_dir, '{}.bval'.format(preproc_prefix))
     bvecs_preproc_file = os.path.join(preproc_dir, '{}.bvec'.format(preproc_prefix))
 
-    utils.copy_file(dwi_unbiased_file, dwi_preproc_file)
-    utils.copy_file(bvals_unbiased_file, bvals_preproc_file)
-    utils.copy_file(bvecs_unbiased_file, bvecs_preproc_file)
+    utils.copy_file(dwi_grad_corrected_file, dwi_preproc_file)
+    utils.copy_file(bvals_grad_corrected_file, bvals_preproc_file)
+    utils.copy_file(bvecs_grad_corrected_file, bvecs_preproc_file)
 
     tf = time.time()
     dt = round(tf - ti)
@@ -796,6 +838,8 @@ def main():
     gradcheck_vis_file = vis.vis_gradcheck(bvals_checked_files, bvecs_checked_files, bvals_preproc_file, bvecs_preproc_file, bvals_corrected_file, bvecs_corrected_file, vis_dir)
     if params['use_unbias']:
         bias_vis_file = vis.vis_bias(dwi_norm_file, bvals_norm_file, dwi_unbiased_file, bias_field_file, vis_dir)
+    if params['use_grad']:
+        grad_vis_file = vis.vis_grad(bvals_unbiased_file, bvals_preproc_shelled, dwi_grad_corrected_file, resmaple_gradtensor_file, gradtensor_fa_file, mask_file, vis_dir)
     dwi_vis_files = vis.vis_dwi(dwi_preproc_file, bvals_preproc_shelled, bvecs_preproc_file, cnr_dict, vis_dir)
     glyph_vis_file = vis.vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_type=params['glyph_type'])
     fa_vis_file = vis.vis_scalar(fa_file, vis_dir, name='FA', comment='White matter should be bright')
@@ -820,6 +864,8 @@ def main():
     vis_files.append(stats_vis_file)
     if params['use_unbias']:
         vis_files.append(bias_vis_file)
+    if params['use_grad']:
+        vis_files.append(grad_vis_file)
     vis_files.append(gradcheck_vis_file)
     for dwi_vis_file in dwi_vis_files:
         vis_files.append(dwi_vis_file)
@@ -932,6 +978,10 @@ def main():
             utils.remove_file(dwi_unbiased_file)
         else:
             utils.remove_dir(unbias_dir)
+
+        print('CLEARING NONLINEARITY GRADIENT DATA')
+        if params['use_grad']:
+            utils.remove_dir(grad_nonlinear_dir)
 
         print('CLEARING TENSOR-RECONSTRUCTED SIGNAL')
         utils.remove_file(dwi_recon_file)

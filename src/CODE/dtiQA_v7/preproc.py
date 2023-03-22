@@ -1,5 +1,5 @@
 # PreQual: Preprocessing
-# Leon Cai and Qi Yang
+# Leon Cai, Qi Yang, and Praitayini Kanakaraj
 # MASI Lab
 # Vanderbilt University
 
@@ -164,6 +164,17 @@ def synb0(b0_d_file, t1_file, synb0_dir, stripped=False):
     print('SYNB0 FINISHED')
 
     return b0_syn_file
+
+def gradtensor(gradtensor_file, dwi_preproc_file, bvecs_preproc_file, bvals_preproc_file, grad_nonlinear_dir,num_cores):
+
+    print('RUNNING GRADNONLIEARITY CORRECTION WITH {} ...'.format(gradtensor_file))
+
+    gradtensor_cmd = 'bash {} {} {} {} {} {} {}'.format(SHARED_VARS.GRADTENSOR_EXEC_FILE, gradtensor_file, dwi_preproc_file, bvecs_preproc_file, bvals_preproc_file, grad_nonlinear_dir, num_cores)
+    utils.run_cmd(gradtensor_cmd)
+
+    dwi_grad_corrected_file = os.path.join(grad_nonlinear_dir, 'Lcorrected_sig.nii.gz') # original output
+
+    return dwi_grad_corrected_file
 
 def topup(topup_input_b0s_file, topup_acqparams_file, extra_topup_args, topup_dir):
 

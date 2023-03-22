@@ -1,5 +1,5 @@
 # PreQual: Utilities
-# Leon Cai and Qi Yang
+# Leon Cai, Qi Yang, and Praitayini Kanakaraj
 # MASI Lab
 # Vanderbilt University
 
@@ -750,10 +750,13 @@ def pescheme2axis(pe_axis, pe_dir, aff):
 
 # Function Definitions: Visualization
 
-def slice_nii(nii_file, offsets=[0], custom_aff=[], min_percentile=0, max_percentile=100, min_intensity=np.nan, max_intensity=np.nan):
+def slice_nii(nii_file, offsets=[0], custom_aff=[], min_percentile=0, max_percentile=100, min_intensity=np.nan, max_intensity=np.nan, det=False):
 
-    img, aff, hdr = load_nii(nii_file, ndim=3)
-
+    if det:
+        img, aff, hdr = load_nii(nii_file, ndim=4)
+        img = det_matrix(img)
+    else:
+        img, aff, hdr = load_nii(nii_file, ndim=3)
     # Extract voxel dimensions and reorient image in radiological view
 
     vox_dim = hdr.get_zooms()
@@ -932,3 +935,48 @@ def _unique_prefixes(volume_prefixes):
     unique_volume_prefix_indices.sort()
     unique_volume_prefixes = volume_prefixes[unique_volume_prefix_indices]
     return unique_volume_prefixes
+
+def compute_FA(resmaple_gradtensor_file, gradtensor_fa_file):
+    
+    img = nib.load(resmaple_gradtensor_file)
+    affine = img.affine
+    LR_mat = img.get_fdata()
+    eig_vol = np.zeros([LR_mat.shape[0],LR_mat.shape[1],LR_mat.shape[2],3])
+    for i in range(LR_mat.shape[0]):
+        for j in range(LR_mat.shape[1]):
+            for k in range(LR_mat.shape[2]):
+                r = np.reshape(LR_mat[i,j,k,:],[3,3])
+                w, _ = np.linalg.eig(r)
+                eig_vol[i,j,k,:] = w
+
+    ev1 = eig_vol[:,:,:,0]
+    ev2 = eig_vol[:,:,:,1]
+    ev3 = eig_vol[:,:,:,2]
+    FA = np.sqrt(0.5) * ( np.sqrt ((ev1 - ev2) ** 2 + (ev2 - ev3) ** 2 + (ev3 - ev1) ** 2) / (np.sqrt (ev1 **2) + (ev2 **2) + (ev3 **2)))
+    fa_img = nib.Nifti1Image(FA.astype(np.float32), affine)
+    nib.save(fa_img, gradtensor_fa_file)
+
+def det_matrix(l):
+        x_dim = l.shape[0]
+        y_dim = l.shape[1]
+        z_dim = l.shape[2]
+        vL = np.zeros((3,3,x_dim,y_dim,z_dim))
+        vL[0,0,:,:,:] = l[:,:,:,0]
+        vL[0,1,:,:,:] = l[:,:,:,1]
+        vL[0,2,:,:,:] = l[:,:,:,2]
+        vL[1,0,:,:,:] = l[:,:,:,3]
+        vL[1,1,:,:,:] = l[:,:,:,4]
+        vL[1,2,:,:,:] = l[:,:,:,5]
+        vL[2,0,:,:,:] = l[:,:,:,6]
+        vL[2,1,:,:,:] = l[:,:,:,7]
+        vL[2,2,:,:,:] = l[:,:,:,8]
+
+        L_det = np.zeros((x_dim,y_dim,z_dim))
+
+        # Along all axis obtain the determinant of LR matrix
+        for x in range(x_dim):
+                for y in range(y_dim):
+                        for z in range(z_dim):
+                                L_mat = np.squeeze(vL[:,:,x,y,z])
+                                L_det[x,y,z] = np.linalg.det(L_mat[:,:])
+        return L_det
