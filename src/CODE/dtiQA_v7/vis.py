@@ -30,7 +30,8 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
 
         'Authors:\n'
         '- Leon Cai (leon.y.cai@vanderbilt.edu)\n'
-        '- Qi Yang (qi.yang@vanderbilt.edu)\n\n'
+        '- Qi Yang (qi.yang@vanderbilt.edu)\n'
+        '- Praitayini Kanakaraj (praitayini.kanakaraj@vanderbilt.edu)\n\n'
 
         'Run Date: {}\n\n'
 

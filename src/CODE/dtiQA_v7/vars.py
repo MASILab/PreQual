@@ -55,8 +55,8 @@ class SharedVars():
 
         # Define versioning and creation date
 
-        self.VERSION = '1.0.8'
-        self.CREATION_DATE = 'August 27, 2022'
+        self.VERSION = '1.1.0'
+        self.CREATION_DATE = 'April 18, 2023'
 
 # Define instance of SharedVars class that will be accessible to (and editable by) other modules
 
