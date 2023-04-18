@@ -103,10 +103,9 @@ From: ubuntu:18.04
     cd /
     apt-get -y install wget git gcc libpq-dev python-dev python-pip python3 python3.8 python3.8-venv python3.8-dev python3-dev python3-pip python3-venv python3-wheel libpng-dev libfreetype6-dev libblas3 liblapack3 libblas-dev liblapack-dev pkg-config
     cd /INSTALLERS
-    #git clone https://github.com/MASILab/PreQual.git
-    git clone -b pk https://github.com/praitayini/PreQual.git
+    git clone https://github.com/MASILab/PreQual.git
     cd PreQual
-    git checkout v1.0.8
+    #git checkout v1.0.8 change to v1.1.0 after realease
     mv src/APPS/* /APPS
     mv src/CODE/* /CODE
     mv src/SUPPLEMENTAL/* /SUPPLEMENTAL
@@ -126,6 +125,7 @@ From: ubuntu:18.04
     python3.8 -m venv gradvenv
     source gradvenv/bin/activate
     pip3 install wheel
+    pip install -r /INSTALLERS/PreQual/venv/pip_install_gradtensor.txt
     wget https://bootstrap.pypa.io/get-pip.py
     python3.8 get-pip.py
     pip3 install --upgrade setuptools
