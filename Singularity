@@ -124,14 +124,13 @@ From: ubuntu:18.04
     cd /APPS/gradtensor
     python3.8 -m venv gradvenv
     source gradvenv/bin/activate
-    pip3 install wheel
-    pip install -r /INSTALLERS/PreQual/venv/pip_install_gradtensor.txt
     wget https://bootstrap.pypa.io/get-pip.py
     python3.8 get-pip.py
     pip3 install --upgrade setuptools
     pip install fpdf imageio pypng freetype-py numpy==1.21.*
     git clone https://github.com/scilus/scilpy.git
     cd scilpy
+    git checkout 1.4.0
     pip install -e .
     cd ..
     deactivate
