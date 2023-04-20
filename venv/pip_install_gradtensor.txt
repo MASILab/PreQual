@@ -1,7 +1,2 @@
 nibabel==3.0.0
 dipy==1.5.0
-fpdf
-imageio
-pypng
-freetype-py
-numpy==1.21.*
