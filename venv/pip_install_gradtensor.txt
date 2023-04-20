@@ -1,2 +1,8 @@
-nibabel==2.5.2
+nibabel==3.0.0
 dipy==1.5.0
+fpdf
+imageio
+pypng
+freetype-py
+numpy==1.21.*
+-e git+ssh://git@github.com/scilus/scilpy.git@1195f002edc35220ea95383b1234aa73138cb623#egg=scilpy
