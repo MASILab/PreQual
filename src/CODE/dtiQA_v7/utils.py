@@ -783,11 +783,11 @@ def slice_nii(nii_file, offsets=False, custom_aff=[], min_percentile=0, max_perc
     i2 = int(round(img.shape[2] / 2, 1))
 
     if offsets:
-        slice1 = int(round(i2 * 0.3))
-        slice2 = int(round(i2 * 0.4))
-        slice3 = int(round(i2 * 0.5))
-        slice4 = int(round(i2 * 0.6))
-        slice5 = int(round(i2 * 0.7))
+        slice1 = int(round(i2 * 0.3, 1))
+        slice2 = int(round(i2 * 0.4, 1))
+        slice3 = int(round(i2 * 0.5, 1))
+        slice4 = int(round(i2 * 0.6, 1))
+        slice5 = int(round(i2 * 0.7, 1))
         offset_value = [ slice1, slice2, slice3, slice4, slice5 ]
     else:
         offset_value = [0] 
