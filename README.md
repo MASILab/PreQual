@@ -91,7 +91,7 @@ Alternatively, a pre-built container can be downloaded [here](https://masi.vuse.
     pe_axis
     [options]
     
-* Binding the freesurfer license is optional and only needed for Synb0-DisCo
+* Binding the freesurfer license is optional and only needed for Synb0-DisCo. Note that a license for freesurfer must be downloaded in order to make the freesurfer software tools operational: <https://surfer.nmr.mgh.harvard.edu/fswiki/License>.
 * Binding the tmp directory is necessary when running the image with `--contain`.
 * Binding --home is necessary for matlab since it uses home for temp storage. 
 * `--nv` and `-B /path/to/cuda:/usr/local/cuda` are optional. See options `--eddy_cuda` and `--eddy_extra_args`. **GPU support is currently experimental.**
