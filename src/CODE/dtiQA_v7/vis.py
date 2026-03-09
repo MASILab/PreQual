@@ -581,7 +581,7 @@ def vis_degibbs(dwi_files, bvals_files, dwi_degibbs_files, gains, vis_dir):
 
     # Plot 5 central triplanar views
 
-    res_slices, res_vox_dim, res_min, res_max = utils.slice_nii(res_file, offsets=[-10, -5, 0, 5, 10], min_intensity=0, max_percentile=99)
+    res_slices, res_vox_dim, res_min, res_max = utils.slice_nii(res_file, offsets=True, min_intensity=0, max_percentile=99)
     temp_vis_file = _vis_vol(res_slices, res_vox_dim, res_min, res_max, temp_dir, name='Gibbs_Deringing,_Averaged_Residuals_of_b_=_0_Volumes', comment='Residuals should be larger at high-contrast interfaces', colorbar=False)
     degibbs_vis_file = utils.rename_file(temp_vis_file, os.path.join(vis_dir, 'degibbs.pdf'))
 
@@ -949,7 +949,7 @@ def vis_dwi(dwi_file, bvals_shelled, bvecs_file, cnr_dict, vis_dir):
         bX = bvals[i]
         bXs_file, num_bXs, _ = utils.dwi_extract(dwi_file, bvals_shelled_file, temp_dir, target_bval=bX, first_only=False)
         bXs_avg_file = utils.dwi_avg(bXs_file, temp_dir)
-        bXs_avg_slices, bXs_avg_vox_dim, bXs_avg_min, bXs_avg_max = utils.slice_nii(bXs_avg_file, offsets=[-10, -5, 0, 5, 10], min_intensity=0, max_percentile=SHARED_VARS.VIS_PERCENTILE_MAX)
+        bXs_avg_slices, bXs_avg_vox_dim, bXs_avg_min, bXs_avg_max = utils.slice_nii(bXs_avg_file, offsets=True, min_intensity=0, max_percentile=SHARED_VARS.VIS_PERCENTILE_MAX)
         
         cnr = '{:.3f}'.format(cnr_dict[bX])
         cnr_label = 'SNR' if bX == 0 else 'CNR'
@@ -974,7 +974,7 @@ def vis_scalar(scalar_file, vis_dir, name='?', comment=''):
     elif name == 'MD':
         scalar_max = SHARED_VARS.ADC_WATER
     
-    scalar_slices, scalar_vox_dim, _, _ = utils.slice_nii(scalar_file, offsets=[-10, -5, 0, 5, 10])
+    scalar_slices, scalar_vox_dim, _, _ = utils.slice_nii(scalar_file, offsets=True)
     scalar_vis_file = _vis_vol(scalar_slices, scalar_vox_dim, scalar_min, scalar_max, vis_dir, name=name, comment=comment, colorbar=True)
     
     return scalar_vis_file

@@ -750,7 +750,7 @@ def pescheme2axis(pe_axis, pe_dir, aff):
 
 # Function Definitions: Visualization
 
-def slice_nii(nii_file, offsets=[0], custom_aff=[], min_percentile=0, max_percentile=100, min_intensity=np.nan, max_intensity=np.nan, det=False):
+def slice_nii(nii_file, offsets=False, custom_aff=[], min_percentile=0, max_percentile=100, min_intensity=np.nan, max_intensity=np.nan, det=False):
 
     if det:
         img, aff, hdr = load_nii(nii_file, ndim=4)
@@ -782,10 +782,20 @@ def slice_nii(nii_file, offsets=[0], custom_aff=[], min_percentile=0, max_percen
     i1 = int(round(img.shape[1] / 2, 1))
     i2 = int(round(img.shape[2] / 2, 1))
 
+    if offsets:
+        slice1 = int(round(i2 * 0.3, 1))
+        slice2 = int(round(i2 * 0.4, 1))
+        slice3 = int(round(i2 * 0.5, 1))
+        slice4 = int(round(i2 * 0.6, 1))
+        slice5 = int(round(i2 * 0.7, 1))
+        offset_value = [ slice1, slice2, slice3, slice4, slice5 ]
+    else:
+        offset_value = [0] 
+
     i0s = []
     i1s = []
     i2s = []
-    for offset in offsets:
+    for offset in offset_value:
         i0s.append(i0 + offset)
         i1s.append(i1 + offset)
         i2s.append(i2 + offset)
