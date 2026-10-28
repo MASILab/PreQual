@@ -7,6 +7,7 @@
 
 import sys
 import os
+import subprocess
 
 import nibabel as nib
 import numpy as np
@@ -216,14 +217,16 @@ def eddy(eddy_input_dwi_file, eddy_input_bvals_file, eddy_input_bvecs_file, eddy
 
     utils.remove_dir(temp_dir)
 
-    # Determine version of eddy to run
+    # Determine version of eddy to run. FSL >= 6.0.6 ships eddy_cpu (multithreaded via --nthr)
+    # and eddy_cuda (GPU, requires the container to be run with --nv). The old eddy_openmp and
+    # eddy_cuda<version> executables no longer exist.
 
-    if eddy_cuda_version == 8.0:
-        eddy_exec = 'eddy_cuda8.0'
-    elif eddy_cuda_version == 9.1:
-        eddy_exec = 'eddy_cuda9.1'
+    if eddy_cuda_version:
+        eddy_exec = 'eddy_cuda'
+        thread_options = ''
     else:
-        eddy_exec = 'eddy_openmp'
+        eddy_exec = 'eddy_cpu'
+        thread_options = '--nthr={}'.format(SHARED_VARS.NUM_THREADS)
 
     # Set outputs
 
@@ -235,12 +238,13 @@ def eddy(eddy_input_dwi_file, eddy_input_bvals_file, eddy_input_bvecs_file, eddy
 
     # Run eddy and rerun if data not shelled
 
-    eddy_cmd = 'export OMP_NUM_THREADS={} ; {} --verbose --imain={} --bvals={} --bvecs={} --mask={} --acqp={} --index={} --repol --cnr_maps --out={} {} {}'.format(
-        SHARED_VARS.NUM_THREADS, eddy_exec, 
-        eddy_input_dwi_file, eddy_input_bvals_file, eddy_input_bvecs_file, eddy_mask_file, 
-        eddy_acqparams_file, eddy_index_file, 
-        eddy_results_prefix, 
-        topup_options, 
+    eddy_cmd = 'export OMP_NUM_THREADS={} ; {} --verbose --imain={} --bvals={} --bvecs={} --mask={} --acqp={} --index={} --repol --cnr_maps --out={} {} {} {}'.format(
+        SHARED_VARS.NUM_THREADS, eddy_exec,
+        eddy_input_dwi_file, eddy_input_bvals_file, eddy_input_bvecs_file, eddy_mask_file,
+        eddy_acqparams_file, eddy_index_file,
+        eddy_results_prefix,
+        thread_options,
+        topup_options,
         extra_eddy_args
     )
 
@@ -370,3 +374,24 @@ def scalars(tensor_file, mask_file, scalars_dir):
     print('ALL SCALARS GENERATED')
 
     return fa_file, md_file, ad_file, rd_file, v1_file
+
+def tardis(dwi_file, bvals_file, bvecs_file, t1_file, tardis_dir, num_threads):
+
+    # TARDIS FOV extension (see /APPS/tardis/tardis.sh). This is an add-on stage: it never fails the
+    # pipeline. Returns (success, warning_str). Exit code 3 means no shell had enough directions.
+
+    print('RUNNING TARDIS FOV EXTENSION WITH {} ...'.format(t1_file))
+
+    tardis_cmd = 'bash {} {} {} {} {} {} {}'.format(SHARED_VARS.TARDIS_EXEC_FILE, dwi_file, bvals_file, bvecs_file, t1_file, tardis_dir, num_threads)
+    print('RUNNING: {}'.format(tardis_cmd))
+    rc = subprocess.call(tardis_cmd, shell=True)
+
+    if rc == 0:
+        print('FINISHED TARDIS FOV EXTENSION')
+        return True, ''
+    elif rc == 3:
+        warning_str = 'TARDIS FOV extension was skipped: no shell has enough gradient directions for either TARDIS model (>= 28 for the FOD model, >= 6 for the tensor model).'
+    else:
+        warning_str = 'TARDIS FOV extension failed (exit code {}). See the log for details; the rest of the pipeline is unaffected.'.format(rc)
+    print('WARNING: {}'.format(warning_str))
+    return False, warning_str

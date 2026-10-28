@@ -4,15 +4,93 @@ import numpy as np
 from dipy.core.sphere import Sphere
 from dipy.reconst.shm import sf_to_sh, sh_to_sf
 from dipy.core.gradients import gradient_table_from_bvals_bvecs
-from scilpy.reconst.raw_signal import compute_dwi_attenuation
-from scilpy.utils.bvec_bval_tools import (check_b0_threshold, is_normalized_bvecs, normalize_bvecs)
+
+# ---------------------------------------------------------------------------------------------
+# Helpers vendored from scilpy 1.4.0 (MIT license, github.com/scilus/scilpy) so that this venv
+# no longer depends on scilpy and can run on a current Python / dipy.
+# ---------------------------------------------------------------------------------------------
+
+DEFAULT_B0_THRESHOLD = 20
+
+
+def is_normalized_bvecs(bvecs):
+    """Check if b-vectors (N, 3) are normalized (zero vectors are allowed)."""
+
+    bvecs_norm = np.linalg.norm(bvecs, axis=1)
+    return np.all(np.logical_or(np.abs(bvecs_norm - 1) < 1e-3, bvecs_norm == 0))
+
+
+def normalize_bvecs(bvecs):
+    """Normalize non-zero b-vectors (N, 3) to unit length."""
+
+    bvecs = np.array(bvecs, dtype=np.float64, copy=True)
+    bvecs_norm = np.linalg.norm(bvecs, axis=1)
+    idx = bvecs_norm != 0
+    bvecs[idx] /= bvecs_norm[idx, None]
+    return bvecs
+
+
+def check_b0_threshold(force_b0_threshold, bvals_min, b0_thr=DEFAULT_B0_THRESHOLD):
+    """Warn (or raise) if the minimal b-value is negative or above the b0 threshold."""
+
+    if bvals_min < 0:
+        logging.warning('Warning: Your dataset contains negative b-values (minimal bvalue of {}). This is suspicious. We recommend you check your data.'.format(bvals_min))
+
+    if bvals_min > b0_thr:
+        if force_b0_threshold:
+            logging.warning('Warning: Your minimal bvalue is {}, but the threshold is set to {}. Proceeding with a threshold of {}.'.format(bvals_min, b0_thr, bvals_min))
+            return bvals_min
+        raise ValueError('The minimal bvalue ({}) is greater than the threshold ({}). No b0 volumes can be found.'.format(bvals_min, b0_thr))
+
+    return b0_thr
+
+
+def compute_dwi_attenuation(dwi_weights, b0):
+    """Signal attenuation: DWI divided by the b0, clipped to <= 1 and with non-finite values set to 0."""
+
+    b0 = b0[..., None]
+    dwi_weights = np.minimum(dwi_weights, b0)
+    dwi_attenuation = dwi_weights / b0
+    dwi_attenuation[np.logical_not(np.isfinite(dwi_attenuation))] = 0.
+    return dwi_attenuation
+
+
+# ---------------------------------------------------------------------------------------------
+# dipy compatibility: sh_order was renamed sh_order_max in dipy 1.9 and removed in 2.0
+# ---------------------------------------------------------------------------------------------
+
+def _sf_to_sh(sf, sphere, sh_order, basis_type, smooth):
+    try:
+        return sf_to_sh(sf, sphere, sh_order_max=sh_order, basis_type=basis_type, smooth=smooth)
+    except TypeError:
+        return sf_to_sh(sf, sphere, sh_order, basis_type, smooth=smooth)
+
+
+def _sh_to_sf(sh, sphere, sh_order, basis_type):
+    try:
+        return sh_to_sf(sh, sphere, sh_order_max=sh_order, basis_type=basis_type)
+    except TypeError:
+        return sh_to_sf(sh, sphere, sh_order=sh_order, basis_type=basis_type)
+
+
+# ---------------------------------------------------------------------------------------------
+# Signal reconstruction
+# ---------------------------------------------------------------------------------------------
 
 def reconstruct_signal_at_voxel(i,j,k,n,og_bvec,og_bval,bvec_stack,bval_stack,dwi_hat,sh_order):
         warnings.filterwarnings("ignore")
         dwi = n[i][j][k]
         og_gradient_table = gradient_table_from_bvals_bvecs(og_bval, og_bvec)
+        og_b0_mask = og_gradient_table.b0s_mask
         vec = bvec_stack[i,j,k,:,:]
         val = bval_stack[i,j,k,:]
+
+        # Voxels outside the gradient tensor field of view have no corrected b-table (NaN):
+        # leave the original signal untouched there.
+        if not (np.all(np.isfinite(vec)) and np.all(np.isfinite(val))):
+                dwi_hat[i,j,k,:] = dwi[np.logical_not(og_b0_mask)]
+                return
+
         gradient_table = gradient_table_from_bvals_bvecs(val, vec)
         sh_order=sh_order
         basis_type='tournier07'
@@ -52,7 +130,7 @@ def reconstruct_signal_at_voxel(i,j,k,n,og_bvec,og_bval,bvec_stack,bval_stack,dw
         sphere = Sphere(xyz=bvecs)
 
         # Fit SH (SF TO SH)
-        sh = sf_to_sh(weights_scaled, sphere, sh_order, basis_type, smooth=smooth)
+        sh = _sf_to_sh(weights_scaled, sphere, sh_order, basis_type, smooth)
 
         # Apply mask
         if mask is not None:
@@ -69,7 +147,7 @@ def reconstruct_signal_at_voxel(i,j,k,n,og_bvec,og_bval,bvec_stack,bval_stack,dw
 
         og_sphere = Sphere(xyz=og_bvecs)
 
-        sf = sh_to_sf(sh, og_sphere, sh_order=sh_order, basis_type=basis_type)
+        sf = _sh_to_sf(sh, og_sphere, sh_order, basis_type)
 
         # SF TO DWI (inverse of compute_dwi_attenuation) here weights_hat is DWI with bvec corrected
         b0 = b0[..., None]

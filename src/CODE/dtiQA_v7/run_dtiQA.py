@@ -37,7 +37,7 @@ def main():
     parser.add_argument('--synb0', metavar='raw/stripped/off', default='raw', help='Run topup with a synthetic b0 generated with Synb0-DisCo if no reverse phase encoded images are supplied and a raw or skull stripped T1 is supplied (default = raw)')
     parser.add_argument('--topup_first_b0s_only', action='store_true', help='Run topup with only the first b0 of each image when images have >1 b0 volume (default = run with ALL b0 volumes)')
     parser.add_argument('--extra_topup_args', metavar='string', default='', help='Extra arguments to pass to topup as a list separated by +\'s with no spaces (i.e., --extra_topup_args=--scale=1+--regrid=0)')
-    parser.add_argument('--eddy_cuda', metavar='8.0/9.1/off', default='off', help='Run eddy with CUDA 8.0 or 9.1 or without GPU acceleration and with OPENMP only (default = off)')
+    parser.add_argument('--eddy_cuda', metavar='on/off', default='off', help='Run eddy with NVIDIA GPU acceleration (eddy_cuda, requires the container to be run with --nv) or on the CPU only (eddy_cpu). The legacy values 8.0 and 9.1 are treated as on (default = off)')
     parser.add_argument('--eddy_mask', metavar='on/off', default='on', help='Use a brain mask for eddy (default = on)')
     parser.add_argument('--eddy_bval_scale', metavar='N/off', default='off', help='Positive number with which to scale b-values for eddy only in order to perform distortion correction on super low shells (default = off)')
     parser.add_argument('--extra_eddy_args', metavar='string', default='', help='Extra arguments to pass to eddy as a list separated by +\'s with no spaces (i.e., --extra_eddy_args=--data_is_shelled+--ol_nstd=1)')
@@ -49,6 +49,7 @@ def main():
     parser.add_argument('--split_outputs', action='store_true', help='Split preprocessed output to match structure of input files (default = do NOT split)')
     parser.add_argument('--keep_intermediates', action='store_true', help='Keep intermediate copies of data (default = do NOT keep)')
     parser.add_argument('--correct_grad', metavar='on/off', default='off', help='Perform gradient nonlinearity correction and a gradient tensor should be supplied (default = off)')
+    parser.add_argument('--tardis', metavar='on/off', default='on', help='Regenerate the superior/inferior brain slices cut off by the acquisition field of view with the TARDIS flow models. Requires t1.nii.gz in the inputs directory and is skipped otherwise; uses the GPU when the container is run with --nv (default = on)')
     parser.add_argument('--num_threads', metavar='N', default=1, help='Non-negative integer indicating number of threads to use when running multi-threaded steps of this pipeline (default = 1)')
     parser.add_argument('--project', metavar='string', default='proj', help='Project ID (default = proj)')
     parser.add_argument('--subject', metavar='string', default='subj', help='Subject ID (default = subj)')
@@ -146,12 +147,10 @@ def main():
     if len(params['extra_topup_args']) > 0:
         warning_strs.append('Additional inputs given to topup. These are untested and may produce pipeline failure or inaccurate results.')
 
-    if args.eddy_cuda == '8.0':
-        params['eddy_cuda_version'] = 8.0
-    elif args.eddy_cuda == '9.1':
-        params['eddy_cuda_version'] = 9.1
+    if args.eddy_cuda in ['on', '8.0', '9.1']: # 8.0 and 9.1 kept for backwards compatibility with older PreQual commands
+        params['eddy_cuda_version'] = True
     elif args.eddy_cuda == 'off':
-        params['eddy_cuda_version'] = 0
+        params['eddy_cuda_version'] = False
     else:
         raise utils.DTIQAError('INVALID INPUT FOR --eddy_cuda PARAMETER. EXITING.')
 
@@ -195,6 +194,13 @@ def main():
         params['use_grad'] = False
     else:
         raise utils.DTIQAError('INVALID INPUT FOR --correct_grad PARAMETER. EXITING.')
+
+    if args.tardis == 'on':
+        params['use_tardis_user'] = True
+    elif args.tardis == 'off':
+        params['use_tardis_user'] = False
+    else:
+        raise utils.DTIQAError('INVALID INPUT FOR --tardis PARAMETER. EXITING.')
 
     if args.improbable_mask == 'on':
         params['improbable_mask'] = True
@@ -247,6 +253,11 @@ def main():
         use_synb0 = os.path.exists(t1_file) and params['use_synb0_user'] # if not RPE provided, only run synb0 if T1 provided AND user desires it
         use_topup = use_synb0
 
+    # DETERMINE IF TARDIS FOV EXTENSION CAN RUN: T1 MUST BE PROVIDED
+
+    use_tardis = os.path.exists(t1_file) and params['use_tardis_user']
+    params['use_tardis'] = use_tardis
+
     # PRINT I/O
 
     print('PROJECT DETAILS:')
@@ -271,13 +282,14 @@ def main():
     print('- Prenormalize: {}'.format(params['use_prenormalize']))
     print('- Topup First b0s Only: {}'.format(params['topup_first_b0s_only']))
     print('- Extra Topup Args: {}'.format(params['extra_topup_args']))
-    print('- Eddy CUDA: {}'.format(params['eddy_cuda_version']))
+    print('- Eddy CUDA: {}'.format('on (eddy_cuda)' if params['eddy_cuda_version'] else 'off (eddy_cpu)'))
     print('- Eddy Mask Type: {}'.format(params['eddy_mask_type']))
     print('- Eddy BValue Scale: {}'.format(params['eddy_bval_scale']))
     print('- Extra Eddy Args: {}'.format(params['extra_eddy_args']))
     print('- Postnormalize: {}'.format(params['use_postnormalize']))
     print('- N4 Bias Correction: {}'.format(params['use_unbias']))
     print('- Nonlinear Gradient Correction: {}'.format(params['use_grad']))
+    print('- TARDIS FOV Extension: {}{}'.format(params['use_tardis_user'], '' if use_tardis or not params['use_tardis_user'] else ' (skipped, no T1 provided)'))
     print('- Improbable Mask: {}'.format(params['improbable_mask']))
     print('- Glyph Visualization: {}'.format(params['glyph_type']))
     print('- Atlas Registration: {}'.format(params['atlas_reg_type']))
@@ -805,6 +817,31 @@ def main():
     print('*** DTIQA V7: FINISHED STATISTICAL ANALYSES ({:05d}s) ***'.format(dt))
     print('********************************************************\n')
 
+    # TARDIS FOV EXTENSION (ADD-ON STAGE ON THE PREPROCESSED DATA; A FAILURE HERE NEVER FAILS THE PIPELINE)
+
+    print('**************************************')
+    print('*** DTIQA V7: TARDIS FOV EXTENSION ***')
+    print('**************************************')
+
+    ti = time.time()
+
+    if use_tardis:
+        tardis_dir = utils.make_dir(out_dir, 'TARDIS')
+        tardis_success, tardis_warning_str = preproc.tardis(dwi_preproc_file, bvals_preproc_file, bvecs_preproc_file, t1_sform_file, tardis_dir, SHARED_VARS.NUM_THREADS)
+        if not tardis_success:
+            warning_strs.append(tardis_warning_str)
+            use_tardis = False
+            params['use_tardis'] = False
+    else:
+        print('SKIPPING TARDIS FOV EXTENSION ({})'.format('no T1 provided' if params['use_tardis_user'] else 'turned off'))
+
+    tf = time.time()
+    dt = round(tf - ti)
+
+    print('*****************************************************')
+    print('*** DTIQA V7: TARDIS FOV EXTENSION DONE ({:05d}s) ***'.format(dt))
+    print('*****************************************************\n')
+
     # GENERATE PDF
 
     print('******************************')
@@ -840,6 +877,8 @@ def main():
         bias_vis_file = vis.vis_bias(dwi_norm_file, bvals_norm_file, dwi_unbiased_file, bias_field_file, vis_dir)
     if params['use_grad']:
         grad_vis_file = vis.vis_grad(bvals_unbiased_file, bvals_preproc_shelled, dwi_grad_corrected_file, resmaple_gradtensor_file, gradtensor_fa_file, mask_file, vis_dir)
+    if use_tardis:
+        tardis_vis_files = vis.vis_tardis(tardis_dir, vis_dir)
     dwi_vis_files = vis.vis_dwi(dwi_preproc_file, bvals_preproc_shelled, bvecs_preproc_file, cnr_dict, vis_dir)
     glyph_vis_file = vis.vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_type=params['glyph_type'])
     fa_vis_file = vis.vis_scalar(fa_file, vis_dir, name='FA', comment='White matter should be bright')
@@ -866,6 +905,9 @@ def main():
         vis_files.append(bias_vis_file)
     if params['use_grad']:
         vis_files.append(grad_vis_file)
+    if use_tardis:
+        for tardis_vis_file in tardis_vis_files:
+            vis_files.append(tardis_vis_file)
     vis_files.append(gradcheck_vis_file)
     for dwi_vis_file in dwi_vis_files:
         vis_files.append(dwi_vis_file)

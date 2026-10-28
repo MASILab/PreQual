@@ -52,7 +52,7 @@ for i in bval:
 
     # Set up memory for corrected signal and data for bval
     path = os.path.join(out_dir,'TMP')
-    os.mkdir(path)
+    os.makedirs(path, exist_ok=True) # reused across shells
     xaxis = range(n.shape[0])
     yaxis = range(n.shape[1])
     zaxis = range(n.shape[2]) 

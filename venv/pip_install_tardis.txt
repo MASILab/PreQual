@@ -1,0 +1,10 @@
+# Python 3.12 venv for /APPS/tardis (TARDIS FOV extension).
+# torch is installed first from the PyTorch index (CUDA build by default; the Singularity recipe
+# honours TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu for a CPU-only image).
+numpy>=2.0
+scipy>=1.13
+nibabel>=5.3
+dipy>=1.10
+tqdm>=4.66
+joblib>=1.4
+matplotlib>=3.9

@@ -17,25 +17,19 @@ export PATH=$PATH:$abs_path
 # Set up venv
 source $abs_path/gradvenv/bin/activate
 
-# Prep inputs for gradtensor to b
-echo Preparing the inputs for gradnonlinearity correction
-echo $abs_path/prep_inputs.py $org_bvec_file $org_bval_file $out_dir
-python3.8 $abs_path/prep_inputs.py $org_bvec_file $org_bval_file $out_dir
-
-
-# Run gradtensor to b #/usr/local/MATLAB/MATLAB_Runtime/v92 \
+# Compute the voxelwise corrected b-table from the gradient nonlinearity tensor
+# (Python port of baxpr/gradtensor apply_gradtensor_to_b; no MATLAB runtime needed)
 echo Computing bimages with gradnonlinearity tensor
-$abs_path/run_apply_gradtensor_to_b.sh \
-/usr/local/MATLAB/MATLAB_Runtime/v92 \
-Limg_file $L_file \
-refimg_file $dwi_file \
-bval_file $out_dir/org.bval \
-bvec_file $out_dir/org.bvec \
-out_dir $out_dir || { echo 'apply_gradtensor_to_b failed' ; return 1; }
+python $abs_path/apply_gradtensor_to_b.py \
+--Limg_file $L_file \
+--refimg_file $dwi_file \
+--bval_file $org_bval_file \
+--bvec_file $org_bvec_file \
+--out_dir $out_dir || { echo 'apply_gradtensor_to_b failed' ; exit 1; }
 
 # Run bimages to corrected signal
-echo Computing signal from bimages 
-python $abs_path/bimages_to_sig.py $dwi_file $org_bvec_file $org_bval_file $out_dir $num_threads
+echo Computing signal from bimages
+python $abs_path/bimages_to_sig.py $dwi_file $org_bvec_file $org_bval_file $out_dir $num_threads || { echo 'bimages_to_sig failed' ; exit 1; }
 
 # Done
 echo gradtensor.sh complete!

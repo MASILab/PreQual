@@ -13,7 +13,11 @@ export PATH=$PATH:$abs_path
 
 ## Set up freesurfer
 #export FREESURFER_HOME=$abs_path/freesurfer # this line is executed in singularity environment set up
-export FS_LICENSE=/APPS/freesurfer/license.txt
+# The license is bound to /APPS/freesurfer/license.txt (a symlink into $FREESURFER_HOME in the container).
+# Honor an existing FS_LICENSE only if it points at a real file, otherwise use the bound path.
+if [ -z "$FS_LICENSE" ] || [ ! -s "$FS_LICENSE" ]; then
+  export FS_LICENSE=/APPS/freesurfer/license.txt
+fi
 source $FREESURFER_HOME/SetUpFreeSurfer.sh # can't do this with singularity env set up because singularity uses sh and source and the setup file need bash, so need to do it before we need freesurfer, which for dtiQA is just here
 
 # Set up pytorch
@@ -26,7 +30,7 @@ prepare_input.sh $b0_d_file $t1_file $abs_path/atlases/$mni_1mm_atlas_fname $abs
 NUM_FOLDS=5
 for i in $(seq 1 $NUM_FOLDS);
   do echo Performing inference on FOLD: "$i"
-  python3.6 $abs_path/inference.py $OUTPUTS/T1_norm_lin_atlas_2_5.nii.gz $OUTPUTS/b0_d_lin_atlas_2_5.nii.gz $OUTPUTS/b0_u_lin_atlas_2_5_FOLD_"$i".nii.gz $abs_path/dual_channel_unet/num_fold_"$i"_total_folds_"$NUM_FOLDS"_seed_1_num_epochs_100_lr_0.0001_betas_\(0.9\,\ 0.999\)_weight_decay_1e-05_num_epoch_*.pth
+  python $abs_path/inference.py $OUTPUTS/T1_norm_lin_atlas_2_5.nii.gz $OUTPUTS/b0_d_lin_atlas_2_5.nii.gz $OUTPUTS/b0_u_lin_atlas_2_5_FOLD_"$i".nii.gz $abs_path/dual_channel_unet/num_fold_"$i"_total_folds_"$NUM_FOLDS"_seed_1_num_epochs_100_lr_0.0001_betas_\(0.9\,\ 0.999\)_weight_decay_1e-05_num_epoch_*.pth
 done
 
 # Take mean

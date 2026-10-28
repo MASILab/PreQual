@@ -946,6 +946,9 @@ def compute_FA(resmaple_gradtensor_file, gradtensor_fa_file):
         for j in range(LR_mat.shape[1]):
             for k in range(LR_mat.shape[2]):
                 r = np.reshape(LR_mat[i,j,k,:],[3,3])
+                if not np.all(np.isfinite(r)): # outside the gradient tensor field of view (resampled as NaN)
+                    eig_vol[i,j,k,:] = np.nan
+                    continue
                 w, _ = np.linalg.eig(r)
                 eig_vol[i,j,k,:] = w
 

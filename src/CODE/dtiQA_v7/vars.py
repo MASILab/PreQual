@@ -33,6 +33,11 @@ class SharedVars():
 
         self.GRADTENSOR_EXEC_FILE = os.path.join(app_dir, 'gradtensor', 'gradtensor.sh')
 
+        # Define TARDIS FOV extension variables
+
+        self.TARDIS_EXEC_FILE = os.path.join(app_dir, 'tardis', 'tardis.sh')
+        self.TARDIS_QA_SLICES_PER_END = 8 # max regenerated slices shown per end (superior/inferior) in the PDF
+
         # Define topup variables
 
         self.TOPUP_CNF_FILE = os.path.join(supplemental_dir, 'topup.cnf')
@@ -55,8 +60,8 @@ class SharedVars():
 
         # Define versioning and creation date
 
-        self.VERSION = '1.1.0'
-        self.CREATION_DATE = 'April 18, 2023'
+        self.VERSION = '2.0.0'
+        self.CREATION_DATE = 'October 28, 2026'
 
 # Define instance of SharedVars class that will be accessible to (and editable by) other modules
 

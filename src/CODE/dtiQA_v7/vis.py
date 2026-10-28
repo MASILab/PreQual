@@ -57,6 +57,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
         '- Run Postnormalize: {}\n'
         '- Run N4 Bias Field Correction: {}\n'
         '- Run Gradient Nonlinearity Correction: {}\n'
+        '- Run TARDIS FOV Extension: {}\n'
         '- Mask Improbable Voxels: {}\n'
         '- Glyph Visualization Type: {}\n'
         '- Atlas Registration Type: {}\n'
@@ -77,6 +78,7 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
                 params['use_postnormalize'],
                 params['use_unbias'],
                 params['use_grad'],
+                params.get('use_tardis_user', False),
                 params['improbable_mask'],
                 params['glyph_type'],
                 params['atlas_reg_type'],
@@ -87,7 +89,12 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
     for i in range(len(dwi_files)):
         inputs_str = '{}- {} ({}{}, {})\n'.format(inputs_str, utils.get_prefix(dwi_files[i]), pe_axis, pe_dirs[i], readout_times[i])
     if os.path.exists(t1_file):
-        inputs_str = '{}- {} ({})'.format(inputs_str, utils.get_prefix(t1_file), 'unused' if not use_synb0 else 'skull-stripped' if params['t1_stripped'] else 'raw')
+        t1_uses = []
+        if use_synb0:
+            t1_uses.append('Synb0-DisCo, {}'.format('skull-stripped' if params['t1_stripped'] else 'raw'))
+        if params.get('use_tardis', False):
+            t1_uses.append('TARDIS')
+        inputs_str = '{}- {} ({})'.format(inputs_str, utils.get_prefix(t1_file), ', '.join(t1_uses) if len(t1_uses) > 0 else 'unused')
 
     method_strs, ref_strs = _methods_strs(use_topup, use_synb0, params)
 
@@ -1156,9 +1163,11 @@ def _methods_strs(use_topup, use_synb0, params):
     
     if use_topup:
         if use_synb0:
-            pre_str = 'No reverse phase encoded images were acquired, but corresponding T1 images of the subjects were available. Thus, a T1 image was used to generate a synthetic susceptibility-corrected b0 volume using SYNB0-DISCO, a deep learning framework by Schilling et al. [{}]. This synthetic b0 image was used in conjunction with FSL\'s topup to correct for susceptibility-induced artifacts in the diffusion data. FSL\'s eddy algorithm was then used to correct for'.format(c)
+            strip_str = '' if params.get('t1_stripped', False) else ' The T1 image was skull-stripped with FreeSurfer\'s SynthStrip prior to registration.'
+            pre_str = 'No reverse phase encoded images were acquired, but corresponding T1 images of the subjects were available. Thus, a T1 image was used to generate a synthetic susceptibility-corrected b0 volume using SYNB0-DISCO, a deep learning framework by Schilling et al. [{}][{}].{} This synthetic b0 image was used in conjunction with FSL\'s topup to correct for susceptibility-induced artifacts in the diffusion data. FSL\'s eddy algorithm was then used to correct for'.format(c, c+1, strip_str)
             r.append('[{}] Schilling, K. G. et al. (2019). Synthesized b0 for diffusion distortion correction (Synb0-DisCo). Magnetic resonance imaging, 64, 62-70.'.format(c))
-            c += 1
+            r.append('[{}] Schilling, K. G. et al. (2020). Distortion correction of diffusion weighted MRI without reverse phase-encoding scans or field-maps. PLoS ONE, 15(7), e0236418.'.format(c+1))
+            c += 2
         else:
             pre_str = 'FSL\'s topup and eddy algorithms were used to correct for susceptibilty-induced and'
     else:
@@ -1181,6 +1190,11 @@ def _methods_strs(use_topup, use_synb0, params):
     s.append('Lastly, the preprocessed data were fitted with a tensor model using the dwi2tensor function included with MRTrix3 using an iterative reweighted least squares estimator [{}].'.format(c))
     r.append('[{}] Veraart, J. et al. (2013). Weighted linear least squares estimation of diffusion MRI parameters: strengths, limitations, and pitfalls. Neuroimage, 81, 335-346.'.format(c))
     c += 1
+
+    if params.get('use_tardis', False):
+        s.append('As an additional step, the superior and inferior brain slices cut off by the diffusion acquisition field of view were regenerated with TARDIS, a conditional flow-matching model by Rudravaram et al. [{}] that synthesizes diffusion ADC (or tensor) slices autoregressively from the adjacent acquired slices and the co-registered T1. The T1 was first Rician-denoised and N4 bias-field corrected with ANTs, skull-stripped with SynthStrip, and registered to the mean preprocessed b0 with epi_reg. The acquired slices were not modified; the extended data, a synthetic DWI derived from them, and their CSD or tensor fits are provided separately on the 2x2x1 mm model grid and resampled onto the native grid.'.format(c))
+        r.append('[{}] Rudravaram, G. et al. (2026). Generalizable field of view extension for diffusion MRI via conditional flow matching. arXiv:2610.17401.'.format(c))
+        c += 1
 
     s.append('The quality of this preprocessing pipeline was then assessed qualitatively for gross errors and quantitatively analyzed using a three-step approach.')
 
@@ -1325,3 +1339,156 @@ def _filter_bad_adc(glyph_file, bad_adc3d_nii, filter_dir):
     utils.save_nii(glyph_filtered_img, glyph_aff, glyph_filtered_file)
 
     return glyph_filtered_file
+
+def vis_tardis(tardis_dir, vis_dir):
+
+    # TARDIS FOV extension QA. Page 1: mid-coronal T1 and extended FA (plus mid-sagittal FA) on the TARDIS
+    # model grid with the acquired FOV and the T1 brain extent marked, and a run summary. Then one page per
+    # extended end (superior / inferior) with up to SHARED_VARS.TARDIS_QA_SLICES_PER_END regenerated axial
+    # FA slices, each beside the corresponding T1 slice. Pages are saved as PDF (for dtiQA.pdf) and as PNG
+    # copies in <tardis_dir>/QA.
+
+    import json
+    import matplotlib.gridspec as gridspec
+
+    print('VISUALIZING TARDIS FOV EXTENSION')
+
+    with open(os.path.join(tardis_dir, 'fov.json')) as f:
+        fov = json.load(f)
+    with open(os.path.join(tardis_dir, 'primary_output.txt')) as f:
+        kind, label, primary_dir = f.read().split()
+    with open(os.path.join(tardis_dir, 'inference.json')) as f:
+        inf = json.load(f)
+    with open(os.path.join(tardis_dir, 'meta.json')) as f:
+        meta = json.load(f)
+    with open(os.path.join(tardis_dir, 'plan.json')) as f:
+        plan = json.load(f)
+    vox = meta['vox']
+    shell = [s for s in meta['shells'] if str(s['label']) == label][0]
+
+    t1 = np.nan_to_num(nib.load(os.path.join(tardis_dir, 'model_space', 'T1w.nii.gz')).get_fdata())
+    brain = nib.load(os.path.join(tardis_dir, 'model_space', 'brain_mask.nii.gz')).get_fdata() > 0.5
+    fa = np.clip(np.nan_to_num(nib.load(os.path.join(primary_dir, 'fa.nii.gz')).get_fdata()), 0, 1)
+    t1_max = float(np.percentile(t1[brain], 99)) if brain.any() else float(t1.max())
+    if not t1_max > 0:
+        t1_max = 1.0
+    Z = t1.shape[2]
+
+    # The model grid is canonical RAS. Display radiologically (subject right on the image left) with superior
+    # (coronal/sagittal) or anterior (axial) at the top, matching the rest of the PDF.
+
+    def coronal(a, y):
+        return np.flipud(a[::-1, y, :].T)
+
+    def sagittal(a, x):
+        return np.flipud(a[x, ::-1, :].T)
+
+    def axial(a, z):
+        return np.flipud(a[::-1, :, z].T)
+
+    def row_of(z_boundary): # slice boundary (z +/- 0.5) -> image row after flipud
+        return (Z - 1) - z_boundary
+
+    def fov_lines(ax):
+        for zb in (fov['z_lo_known'] - 0.5, fov['z_hi_known'] + 0.5):
+            ax.axhline(row_of(zb), color='cyan', lw=1, ls='--')
+        for zb in (fov['z_lo_brain'] - 0.5, fov['z_hi_brain'] + 0.5):
+            ax.axhline(row_of(zb), color='orange', lw=1, ls=':')
+        if fov['n_extend_superior'] > 0:
+            ax.axhspan(row_of(fov['z_hi_brain'] + 0.5), row_of(fov['z_hi_known'] + 0.5), color='cyan', alpha=0.12, lw=0)
+        if fov['n_extend_inferior'] > 0:
+            ax.axhspan(row_of(fov['z_lo_known'] - 0.5), row_of(fov['z_lo_brain'] - 0.5), color='cyan', alpha=0.12, lw=0)
+
+    ijk = np.argwhere(brain)
+    cx = int(round(ijk[:, 0].mean())) if ijk.size > 0 else t1.shape[0] // 2
+    cy = int(round(ijk[:, 1].mean())) if ijk.size > 0 else t1.shape[1] // 2
+
+    tardis_vis_files = []
+    qa_dir = utils.make_dir(tardis_dir, 'QA')
+
+    # Page 1: where the FOV is cut
+
+    fig = plt.figure(0, figsize=SHARED_VARS.PAGESIZE)
+    gs = gridspec.GridSpec(2, 3, height_ratios=[3, 1.1], hspace=0.25, wspace=0.08)
+
+    ax = fig.add_subplot(gs[0, 0])
+    ax.imshow(coronal(t1, cy), cmap='gray', vmin=0, vmax=t1_max, aspect=vox[2] / vox[0], interpolation='nearest')
+    fov_lines(ax)
+    ax.set_title('T1 (registered)\nMid-coronal', fontsize=SHARED_VARS.LABEL_FONTSIZE)
+    ax.set_xticks([]); ax.set_yticks([])
+
+    ax = fig.add_subplot(gs[0, 1])
+    ax.imshow(coronal(fa, cy), cmap='gray', vmin=0, vmax=1, aspect=vox[2] / vox[0], interpolation='nearest')
+    fov_lines(ax)
+    ax.set_title('FA of extended data\nMid-coronal', fontsize=SHARED_VARS.LABEL_FONTSIZE)
+    ax.set_xticks([]); ax.set_yticks([])
+
+    ax = fig.add_subplot(gs[0, 2])
+    ax.imshow(sagittal(fa, cx), cmap='gray', vmin=0, vmax=1, aspect=vox[2] / vox[1], interpolation='nearest')
+    fov_lines(ax)
+    ax.set_title('FA of extended data\nMid-sagittal', fontsize=SHARED_VARS.LABEL_FONTSIZE)
+    ax.set_xticks([]); ax.set_yticks([])
+
+    ax = fig.add_subplot(gs[1, :])
+    ax.axis('off')
+    summary_str = \
+    str('Model: {} ({} shell b={}, {} directions), {} ODE steps, seed {}, device: {}, {} s\n'
+        'Model grid: {} voxels at {} mm (RAS). T1 brain spans slices {}-{}; acquired DWI covers slices {}-{} ({} slices).\n'
+        'Regenerated: {} inferior slices ({:.0f} mm) and {} superior slices ({:.0f} mm). Acquired slices are never modified.\n'
+        'Cyan dashed: acquired DWI FOV. Orange dotted: T1 brain extent. Shaded: regenerated slices. Mid-slices are shown in radiological view.'
+        '{}'
+        .format('FOD (30-direction, multi-b)' if kind == 'fod' else 'tensor (6-direction)', kind, label, shell['n_dirs'],
+                inf['ode_steps'], inf['seed'], inf['device'], inf['seconds'],
+                'x'.join(str(d) for d in meta['shape']), 'x'.join('{:g}'.format(v) for v in vox),
+                fov['z_lo_brain'], fov['z_hi_brain'], fov['z_lo_known'], fov['z_hi_known'], fov['n_known'],
+                fov['n_extend_inferior'], fov['mm_extend_inferior'], fov['n_extend_superior'], fov['mm_extend_superior'],
+                ''.join('\nWARNING: {}'.format(w) for w in plan.get('warnings', []))))
+    ax.text(0, 1, summary_str, ha='left', va='top', wrap=True, fontsize=8, transform=ax.transAxes)
+
+    plt.suptitle('TARDIS FOV Extension', fontsize=SHARED_VARS.TITLE_FONTSIZE)
+
+    tardis_fov_vis_file = os.path.join(vis_dir, 'tardis_fov.pdf')
+    plt.savefig(tardis_fov_vis_file, dpi=SHARED_VARS.PDF_DPI)
+    plt.savefig(os.path.join(qa_dir, 'tardis_fov.png'), dpi=150)
+    plt.close()
+    tardis_vis_files.append(tardis_fov_vis_file)
+
+    # Pages 2+: regenerated slices (FA beside T1), one page per extended end
+
+    n_show = SHARED_VARS.TARDIS_QA_SLICES_PER_END
+    for end, zs, edge in (('superior', fov['extend_superior'], fov['z_hi_known']), ('inferior', fov['extend_inferior'], fov['z_lo_known'])):
+
+        if len(zs) == 0:
+            continue
+        picks = np.unique(np.round(np.linspace(0, len(zs) - 1, min(n_show, len(zs)))).astype(int))
+        zs_show = [zs[i] for i in picks]
+
+        n_cols = 4
+        n_rows = int(np.ceil(len(zs_show) / float(n_cols)))
+        fig = plt.figure(0, figsize=SHARED_VARS.PAGESIZE)
+        gs = gridspec.GridSpec(n_rows, 2 * n_cols, hspace=0.35, wspace=0.05)
+
+        for i, z in enumerate(zs_show):
+            r, c = divmod(i, n_cols)
+            mm = abs(z - edge) * vox[2]
+
+            ax = fig.add_subplot(gs[r, 2 * c])
+            ax.imshow(axial(fa, z), cmap='gray', vmin=0, vmax=1, aspect=vox[1] / vox[0], interpolation='nearest')
+            ax.set_title('Slice {} ({:+.0f} mm beyond FOV)'.format(z, mm if end == 'superior' else -mm), fontsize=8, loc='left')
+            ax.text(0.03, 0.03, 'FA', color='white', fontsize=8, transform=ax.transAxes, ha='left', va='bottom')
+            ax.set_xticks([]); ax.set_yticks([])
+
+            ax = fig.add_subplot(gs[r, 2 * c + 1])
+            ax.imshow(axial(t1, z), cmap='gray', vmin=0, vmax=t1_max, aspect=vox[1] / vox[0], interpolation='nearest')
+            ax.text(0.03, 0.03, 'T1', color='white', fontsize=8, transform=ax.transAxes, ha='left', va='bottom')
+            ax.set_xticks([]); ax.set_yticks([])
+
+        plt.suptitle('TARDIS Imputed Slices: {} end ({} of {} regenerated slices shown, FA beside T1)'.format(end, len(zs_show), len(zs)), fontsize=SHARED_VARS.TITLE_FONTSIZE)
+
+        tardis_end_vis_file = os.path.join(vis_dir, 'tardis_{}.pdf'.format(end))
+        plt.savefig(tardis_end_vis_file, dpi=SHARED_VARS.PDF_DPI)
+        plt.savefig(os.path.join(qa_dir, 'tardis_{}.png'.format(end)), dpi=150)
+        plt.close()
+        tardis_vis_files.append(tardis_end_vis_file)
+
+    return tardis_vis_files

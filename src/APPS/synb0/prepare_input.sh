@@ -42,9 +42,15 @@ if [[ "$T1_ATLAS_PATH" == *"mask"* ]]; then
 else
   echo Skull stripping T1
   T1_MASK_PATH=$JOB_PATH/T1_mask.nii.gz
-  BET_CMD="bet $T1_PATH $T1_MASK_PATH -R"
-  echo $BET_CMD
-  eval $BET_CMD
+  # Prefer FreeSurfer's SynthStrip (deep-learning, robust to contrast/FOV); fall back to FSL bet if unavailable
+  if command -v mri_synthstrip > /dev/null 2>&1; then
+    STRIP_CMD="mri_synthstrip -i $T1_PATH -o $T1_MASK_PATH"
+  else
+    echo WARNING: mri_synthstrip not found, falling back to bet
+    STRIP_CMD="bet $T1_PATH $T1_MASK_PATH -R"
+  fi
+  echo $STRIP_CMD
+  eval $STRIP_CMD
 fi
 
 # epi_reg distorted b0 to T1; wont be perfect since B0 is distorted
