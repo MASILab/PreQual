@@ -11,6 +11,8 @@ from io import StringIO
 
 import nibabel as nib
 import numpy as np
+import matplotlib
+matplotlib.use('Agg') # file output only; the Tk backend is unavailable in the container and must not be auto-selected under xvfb
 import matplotlib.pyplot as plt
 import matplotlib.cm as mcm
 #from mpl_toolkits.mplot3d import Axes3D

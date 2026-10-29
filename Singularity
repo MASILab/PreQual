@@ -67,6 +67,9 @@ From: neuro_base_with_ants.tar
     # uv-managed Python interpreters
     export XDG_DATA_HOME=/opt/uv-data
 
+    # matplotlib (all venvs) renders to files only; xvfb sets DISPLAY, which would otherwise select Tk
+    export MPLBACKEND=Agg
+
     export TMPDIR=/tmp
     export PATH="/opt/ants/bin:/opt/mrtrix3/bin:${FSLDIR}/bin:${FREESURFER_HOME}/bin:/APPS/c3d-1.0.0-Linux-x86_64/bin:/opt/uv:${PATH}"
 

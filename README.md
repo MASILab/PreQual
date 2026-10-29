@@ -34,7 +34,7 @@ Example `dtiQA_config.csv` for two forward scans and one reverse phase-encoded s
     dwi2,+,0.05
     rpe,-,0.05
 
-`pe_dir` is `+` or `-` along the phase encoding axis; `readout_time` is the value FSL's eddy expects. See [Configuration File](docs/USER_GUIDE.md#configuration-file) and [Examples](docs/USER_GUIDE.md#examples).
+`pe_dir` is `+` or `-` along the phase encoding axis; `readout_time` is the total readout time in seconds, between 0.01 and 0.2 s as FSL's eddy requires. See [Configuration File](docs/USER_GUIDE.md#configuration-file) and [Examples](docs/USER_GUIDE.md#examples).
 
 ### 3. Run
 

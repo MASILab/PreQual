@@ -13,6 +13,8 @@ import numpy as np
 import nibabel as nib
 from skimage import measure
 from scipy.optimize import fmin
+import matplotlib
+matplotlib.use('Agg') # file output only; the Tk backend is unavailable in the container and must not be auto-selected under xvfb
 import matplotlib.pyplot as plt
 
 from vars import SHARED_VARS
@@ -172,6 +174,11 @@ def load_config(in_dir):
     dwi_prefixes = config_mat[:, 0]
     pe_dirs = list(config_mat[:, 1])
     readout_times = list(config_mat[:, 2].astype('float'))
+
+    # FSL >= 6.0.7 eddy refuses to run with a readout time outside 0.01-0.2 s, so fail here instead of after topup
+    for dwi_prefix, readout_time in zip(dwi_prefixes, readout_times):
+        if not (0.01 <= readout_time <= 0.2):
+            raise DTIQAError('READOUT TIME {} FOR {} IN dtiQA_config.csv IS OUTSIDE THE 0.01-0.2 s RANGE ACCEPTED BY FSL EDDY (DID YOU GIVE IT IN ms?). EXITING.'.format(readout_time, dwi_prefix))
 
     dwi_files = []
     bvals_files = []

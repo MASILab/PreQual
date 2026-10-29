@@ -98,23 +98,28 @@ def prep(dwi_files, bvals_files, bvecs_files, pe_axis, pe_dirs, readout_times, u
             num_b0s.append(1) # will be incorporated into acqparams
             num_vols.append(0) # will not be incorporated into eddy index
     
-    # Write acquisition parameters file to topup (if applicable) and eddy directory: define a phase-encoding scheme for each b0
+    # Write acquisition parameters file to topup (if applicable) and eddy directory: define a phase-encoding scheme for each b0.
+    # The synthetic Synb0 b0 (readout time 0) is only a topup input: it is appended after all acquired images, no eddy index
+    # entry points to it, and FSL >= 6.0.7 eddy rejects acqparams lines with a readout time outside 0.01-0.2 s. So the
+    # eddy file only lists the acquired images.
 
     print('GENERATING ACQPARAMS FILES')
 
+    num_acquired = len(dwi_files)
     acqparams_list = []
     for i in range(len(pe_dirs)):
         for j in range(num_b0s[i]):
             acqparams_list.append(utils.pescheme2params(pe_axis, pe_dirs[i], readout_times[i]))
-    acqparams_str = '\n'.join(acqparams_list)
-    
+    topup_acqparams_str = '\n'.join(acqparams_list)
+    eddy_acqparams_str = '\n'.join(acqparams_list[:int(np.sum(num_b0s[:num_acquired]))])
+
     eddy_acqparams_file = os.path.join(eddy_dir, 'acqparams.txt')
-    utils.write_str(acqparams_str, eddy_acqparams_file)
+    utils.write_str(eddy_acqparams_str, eddy_acqparams_file)
 
     if use_topup:
 
         topup_acqparams_file = os.path.join(topup_dir, 'acqparams.txt')
-        utils.write_str(acqparams_str, topup_acqparams_file)
+        utils.write_str(topup_acqparams_str, topup_acqparams_file)
 
     else:
 
