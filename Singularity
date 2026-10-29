@@ -1,5 +1,5 @@
 Bootstrap: docker-archive
-From: neuro_base_with_ants.tar
+From: /nfs2/harmonization/singularities/neuro_base_with_ants.tar
 
 # ============================================================================
 #  PreQual (dtiQA v7 Multi) v2.0.0
