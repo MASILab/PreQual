@@ -115,11 +115,16 @@ def resample(data, affine, grid, order):
     return np.asarray(nibproc.resample_from_to(img, grid, order=order).dataobj, dtype=np.float32)
 
 
-def fov_analysis(brain, covered, min_vox, cov_frac, erase):
-    """Per-slice brain / coverage -> known FOV and brain extent along z (model grid). -> (fov dict, rows)."""
+def fov_analysis(brain, covered, covered_b0, dwi_z_range, min_vox, cov_frac, erase):
+    """Per-slice brain / coverage -> known FOV and brain extent along z (model grid). -> (fov dict, rows).
+    `covered` requires signal in every DWI volume used, so an edge slice that eddy's inter-scan alignment
+    left only partly valid falls below cov_frac and is regenerated; `covered_b0` (mean b0 only) is reported
+    alongside so the size of that effect is visible."""
     nb = brain.sum(axis=(0, 1))
     nc = (brain & covered).sum(axis=(0, 1))
+    ncb0 = (brain & covered_b0).sum(axis=(0, 1))
     frac = np.where(nb > 0, nc / np.maximum(nb, 1), 0.0)
+    frac_b0 = np.where(nb > 0, ncb0 / np.maximum(nb, 1), 0.0)
     is_brain = nb >= min_vox
     bz = np.where(is_brain)[0]
     if bz.size == 0:
@@ -134,14 +139,23 @@ def fov_analysis(brain, covered, min_vox, cov_frac, erase):
     holes = [int(z) for z in range(z_lo_k, z_hi_k + 1) if is_brain[z] and frac[z] < cov_frac]
     sup = list(range(z_hi_k + 1, z_hi_b + 1))
     inf = list(range(z_lo_k - 1, z_lo_b - 1, -1))
+    # regenerated slices that lie inside the acquired DWI footprint: acquired but only partly valid
+    # (cut off in some volumes after inter-scan alignment, or discarded by --erase-edge)
+    dz_lo, dz_hi = dwi_z_range
+    partial_sup = [z for z in sup if z <= dz_hi and nb[z] > 0]
+    partial_inf = [z for z in inf if z >= dz_lo and nb[z] > 0]
+    partial = {int(z): dict(valid_frac=round(float(frac[z]), 4), b0_frac=round(float(frac_b0[z]), 4))
+               for z in partial_sup + partial_inf}
     fov = dict(z_lo_brain=z_lo_b, z_hi_brain=z_hi_b, z_lo_known=z_lo_k, z_hi_known=z_hi_k,
                n_known=z_hi_k - z_lo_k + 1, extend_superior=sup, extend_inferior=inf,
                n_extend_superior=len(sup), n_extend_inferior=len(inf),
                mm_extend_superior=len(sup) * VOX[2], mm_extend_inferior=len(inf) * VOX[2],
+               n_partial_superior=len(partial_sup), n_partial_inferior=len(partial_inf),
+               partial_slices=partial,
                coverage_frac=cov_frac, min_brain_voxels=min_vox, erase_edge=erase,
                interior_slices_below_coverage=holes)
-    rows = [(z, int(nb[z]), int(nc[z]), round(float(frac[z]), 4), int(z_lo_k <= z <= z_hi_k),
-             int(z in sup or z in inf)) for z in range(len(nb))]
+    rows = [(z, int(nb[z]), int(nc[z]), round(float(frac[z]), 4), round(float(frac_b0[z]), 4),
+             int(z_lo_k <= z <= z_hi_k), int(z in sup or z in inf)) for z in range(len(nb))]
     return fov, rows
 
 
@@ -204,12 +218,16 @@ def main(args):
     footprint = embed(resample(np.ones(dwi_img.shape[:3], np.float32), dwi_img.affine, ref, 0), shape, info) > 0.5
     S0 = np.clip(data[..., b0_idx].mean(axis=-1), SIG_FLOOR, None)
     b0m = data[..., b0_idx].mean(axis=-1)
-    covered = footprint & (b0m > 0)
+    covered_b0 = footprint & (b0m > 0)
+    # a voxel only counts as acquired if every volume used has signal there: after eddy aligns scans with
+    # different coverage, the outermost slices can be zero in some volumes (partly cut off)
+    covered = covered_b0 & (data[..., needed].min(axis=-1) > 0)
 
     brain = resample(np.asarray(mask_img.dataobj, dtype=np.float32), mask_img.affine, grid, 0) > 0.5
     t1 = np.nan_to_num(resample(np.asarray(t1_img.dataobj, dtype=np.float32), t1_img.affine, grid, 1), nan=0.0)
     t1[~brain] = 0.0
-    fov, rows = fov_analysis(brain, covered, args.min_brain_voxels, args.coverage_frac, args.erase_edge)
+    fov, rows = fov_analysis(brain, covered, covered_b0, info["dwi_z_range_in_grid"], args.min_brain_voxels,
+                             args.coverage_frac, args.erase_edge)
     p99 = float(np.percentile(t1[:, :, fov["z_lo_brain"]:fov["z_hi_brain"] + 1], 99))
     p99 = p99 if np.isfinite(p99) and p99 > 0 else 1.0
     t1n = np.ascontiguousarray(np.moveaxis(np.clip(t1 / p99, 0.0, 1.0) * 2.0 - 1.0, 2, 0)).astype(np.float32)
@@ -237,7 +255,7 @@ def main(args):
     (out / "fov.json").write_text(json.dumps(fov, indent=2))
     with (out / "fov_slices.csv").open("w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["z", "brain_voxels", "covered_voxels", "covered_frac", "known_fov", "regenerated"])
+        w.writerow(["z", "brain_voxels", "covered_voxels", "covered_frac_all_volumes", "covered_frac_b0", "known_fov", "regenerated"])
         w.writerows(rows)
     for name, arr, dt in (("T1w", t1, np.float32), ("brain_mask", brain, np.uint8),
                           ("dwi_coverage", covered, np.uint8), ("b0_mean", b0m * brain, np.float32)):
@@ -245,6 +263,11 @@ def main(args):
     print(f"brain z {fov['z_lo_brain']}..{fov['z_hi_brain']} | acquired z {fov['z_lo_known']}..{fov['z_hi_known']} | "
           f"regenerate {fov['n_extend_inferior']} inferior + {fov['n_extend_superior']} superior slices "
           f"({fov['mm_extend_inferior']:.0f} + {fov['mm_extend_superior']:.0f} mm)", flush=True)
+    if fov["n_partial_superior"] or fov["n_partial_inferior"]:
+        print(f"acquired edge slices regenerated because < {args.coverage_frac:.0%} of their brain voxels are valid in "
+              f"every volume: {fov['n_partial_inferior']} inferior, {fov['n_partial_superior']} superior "
+              f"(valid fractions: " + ", ".join(f"z{z}={v['valid_frac']:.2f}" for z, v in sorted(fov['partial_slices'].items())) + ")",
+              flush=True)
     if fov["interior_slices_below_coverage"]:
         print(f"WARNING: slices {fov['interior_slices_below_coverage']} inside the acquired FOV are below "
               f"{args.coverage_frac:.0%} coverage", flush=True)

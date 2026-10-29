@@ -36,7 +36,8 @@ class SharedVars():
         # Define TARDIS FOV extension variables
 
         self.TARDIS_EXEC_FILE = os.path.join(app_dir, 'tardis', 'tardis.sh')
-        self.TARDIS_QA_SLICES_PER_END = 8 # max regenerated slices shown per end (superior/inferior) in the PDF
+        self.TARDIS_QA_COLS = 4 # FA/T1 slice pairs per row on the TARDIS imputed-slice pages
+        self.TARDIS_QA_ROWS = 6 # max rows per page; longer selections continue on further pages
 
         # Define topup variables
 

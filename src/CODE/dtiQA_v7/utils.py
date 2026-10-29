@@ -789,13 +789,19 @@ def slice_nii(nii_file, offsets=[0], custom_aff=[], min_percentile=0, max_percen
     i1 = int(round(img.shape[1] / 2, 1))
     i2 = int(round(img.shape[2] / 2, 1))
 
-    i0s = []
-    i1s = []
-    i2s = []
-    for offset in offsets:
-        i0s.append(i0 + offset)
-        i1s.append(i1 + offset)
-        i2s.append(i2 + offset)
+    # Offsets are requested in voxels around the center slice. When an axis has fewer slices than the
+    # requested span (thick slices, few slices), scale the offsets down so that they stay inside the
+    # volume and still spread across it instead of indexing out of range.
+
+    def _axis_indices(center, n):
+        max_abs = max([abs(offset) for offset in offsets] + [0])
+        half = (n - 1) // 2
+        factor = 1.0 if max_abs <= half else float(half) / float(max_abs)
+        return [int(min(max(center + int(np.round(offset * factor)), 0), n - 1)) for offset in offsets] # np.round: utils defines its own round()
+
+    i0s = _axis_indices(i0, img.shape[0])
+    i1s = _axis_indices(i1, img.shape[1])
+    i2s = _axis_indices(i2, img.shape[2])
 
     s0s = img[i0s, :, :]
     s1s = img[:, i1s, :]

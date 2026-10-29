@@ -33,7 +33,8 @@ def vis_title(dwi_files, t1_file, pe_axis, pe_dirs, readout_times, use_topup, us
         'Authors:\n'
         '- Leon Cai (leon.y.cai@vanderbilt.edu)\n'
         '- Qi Yang (qi.yang@vanderbilt.edu)\n'
-        '- Praitayini Kanakaraj (praitayini.kanakaraj@vanderbilt.edu)\n\n'
+        '- Praitayini Kanakaraj (praitayini.kanakaraj@vanderbilt.edu)\n'
+        '- Gaurav Rudravaram (gaurav.rudravaram@vanderbilt.edu)\n\n'
 
         'Run Date: {}\n\n'
 
@@ -1396,10 +1397,6 @@ def vis_tardis(tardis_dir, vis_dir):
             ax.axhline(row_of(zb), color='cyan', lw=1, ls='--')
         for zb in (fov['z_lo_brain'] - 0.5, fov['z_hi_brain'] + 0.5):
             ax.axhline(row_of(zb), color='orange', lw=1, ls=':')
-        if fov['n_extend_superior'] > 0:
-            ax.axhspan(row_of(fov['z_hi_brain'] + 0.5), row_of(fov['z_hi_known'] + 0.5), color='cyan', alpha=0.12, lw=0)
-        if fov['n_extend_inferior'] > 0:
-            ax.axhspan(row_of(fov['z_lo_known'] - 0.5), row_of(fov['z_lo_brain'] - 0.5), color='cyan', alpha=0.12, lw=0)
 
     ijk = np.argwhere(brain)
     cx = int(round(ijk[:, 0].mean())) if ijk.size > 0 else t1.shape[0] // 2
@@ -1435,15 +1432,16 @@ def vis_tardis(tardis_dir, vis_dir):
     ax.axis('off')
     summary_str = \
     str('Model: {} ({} shell b={}, {} directions), {} ODE steps, seed {}, device: {}, {} s\n'
-        'Model grid: {} voxels at {} mm (RAS). T1 brain spans slices {}-{}; acquired DWI covers slices {}-{} ({} slices).\n'
-        'Regenerated: {} inferior slices ({:.0f} mm) and {} superior slices ({:.0f} mm). Acquired slices are never modified.\n'
-        'Cyan dashed: acquired DWI FOV. Orange dotted: T1 brain extent. Shaded: regenerated slices. Mid-slices are shown in radiological view.'
+        'T1 brain spans slices {}-{}; acquired DWI covers slices {}-{} ({} slices of {:g} mm).\n'
+        'Regenerated: {} inferior slices ({:.0f} mm) and {} superior slices ({:.0f} mm). Fully acquired slices are never modified.\n'
+        '{}'
+        'Cyan dashed: acquired DWI FOV. Orange dotted: T1 brain extent. Mid-slices are shown in radiological view.'
         '{}'
         .format('FOD (30-direction, multi-b)' if kind == 'fod' else 'tensor (6-direction)', kind, label, shell['n_dirs'],
                 inf['ode_steps'], inf['seed'], inf['device'], inf['seconds'],
-                'x'.join(str(d) for d in meta['shape']), 'x'.join('{:g}'.format(v) for v in vox),
-                fov['z_lo_brain'], fov['z_hi_brain'], fov['z_lo_known'], fov['z_hi_known'], fov['n_known'],
+                fov['z_lo_brain'], fov['z_hi_brain'], fov['z_lo_known'], fov['z_hi_known'], fov['n_known'], vox[2],
                 fov['n_extend_inferior'], fov['mm_extend_inferior'], fov['n_extend_superior'], fov['mm_extend_superior'],
+                _tardis_partial_str(fov),
                 ''.join('\nWARNING: {}'.format(w) for w in plan.get('warnings', []))))
     ax.text(0, 1, summary_str, ha='left', va='top', wrap=True, fontsize=8, transform=ax.transAxes)
 
@@ -1455,42 +1453,65 @@ def vis_tardis(tardis_dir, vis_dir):
     plt.close()
     tardis_vis_files.append(tardis_fov_vis_file)
 
-    # Pages 2+: regenerated slices (FA beside T1), one page per extended end
+    # Pages 2+: regenerated slices (FA beside T1), one or more pages per extended end. Slice spacing depends on
+    # the extension length: <= 10 mm every slice, <= 20 mm every 2 mm, beyond that every 3 mm. Up to
+    # TARDIS_QA_COLS pairs per row and TARDIS_QA_ROWS rows per page; longer selections continue on further pages.
 
-    n_show = SHARED_VARS.TARDIS_QA_SLICES_PER_END
+    n_cols = SHARED_VARS.TARDIS_QA_COLS
+    max_rows = SHARED_VARS.TARDIS_QA_ROWS
+    per_page = n_cols * max_rows
     for end, zs, edge in (('superior', fov['extend_superior'], fov['z_hi_known']), ('inferior', fov['extend_inferior'], fov['z_lo_known'])):
 
         if len(zs) == 0:
             continue
-        picks = np.unique(np.round(np.linspace(0, len(zs) - 1, min(n_show, len(zs)))).astype(int))
-        zs_show = [zs[i] for i in picks]
+        extent_mm = len(zs) * vox[2]
+        step_mm = 1.0 if extent_mm <= 10 else 2.0 if extent_mm <= 20 else 3.0
+        step = max(1, int(np.round(step_mm / vox[2])))
+        zs_show = zs[::step] # zs is ordered from the FOV edge outward
 
-        n_cols = 4
-        n_rows = int(np.ceil(len(zs_show) / float(n_cols)))
-        fig = plt.figure(0, figsize=SHARED_VARS.PAGESIZE)
-        gs = gridspec.GridSpec(n_rows, 2 * n_cols, hspace=0.35, wspace=0.05)
+        n_pages = int(np.ceil(len(zs_show) / float(per_page)))
+        for page in range(n_pages):
+            zs_page = zs_show[page * per_page:(page + 1) * per_page]
+            n_rows = int(np.ceil(len(zs_page) / float(n_cols)))
+            fig = plt.figure(0, figsize=SHARED_VARS.PAGESIZE)
+            gs = gridspec.GridSpec(max_rows, 2 * n_cols, hspace=0.45, wspace=0.05) # fixed row count keeps panel size constant across pages
 
-        for i, z in enumerate(zs_show):
-            r, c = divmod(i, n_cols)
-            mm = abs(z - edge) * vox[2]
+            for i, z in enumerate(zs_page):
+                r, c = divmod(i, n_cols)
+                mm = abs(z - edge) * vox[2]
 
-            ax = fig.add_subplot(gs[r, 2 * c])
-            ax.imshow(axial(fa, z), cmap='gray', vmin=0, vmax=1, aspect=vox[1] / vox[0], interpolation='nearest')
-            ax.set_title('Slice {} ({:+.0f} mm beyond FOV)'.format(z, mm if end == 'superior' else -mm), fontsize=8, loc='left')
-            ax.text(0.03, 0.03, 'FA', color='white', fontsize=8, transform=ax.transAxes, ha='left', va='bottom')
-            ax.set_xticks([]); ax.set_yticks([])
+                ax = fig.add_subplot(gs[r, 2 * c])
+                ax.imshow(axial(fa, z), cmap='gray', vmin=0, vmax=1, aspect=vox[1] / vox[0], interpolation='nearest')
+                ax.set_title('Slice {} ({:+.0f} mm beyond FOV)'.format(z, mm if end == 'superior' else -mm), fontsize=7, loc='left')
+                ax.text(0.03, 0.03, 'FA', color='white', fontsize=7, transform=ax.transAxes, ha='left', va='bottom')
+                ax.set_xticks([]); ax.set_yticks([])
 
-            ax = fig.add_subplot(gs[r, 2 * c + 1])
-            ax.imshow(axial(t1, z), cmap='gray', vmin=0, vmax=t1_max, aspect=vox[1] / vox[0], interpolation='nearest')
-            ax.text(0.03, 0.03, 'T1', color='white', fontsize=8, transform=ax.transAxes, ha='left', va='bottom')
-            ax.set_xticks([]); ax.set_yticks([])
+                ax = fig.add_subplot(gs[r, 2 * c + 1])
+                ax.imshow(axial(t1, z), cmap='gray', vmin=0, vmax=t1_max, aspect=vox[1] / vox[0], interpolation='nearest')
+                ax.text(0.03, 0.03, 'T1', color='white', fontsize=7, transform=ax.transAxes, ha='left', va='bottom')
+                ax.set_xticks([]); ax.set_yticks([])
 
-        plt.suptitle('TARDIS Imputed Slices: {} end ({} of {} regenerated slices shown, FA beside T1)'.format(end, len(zs_show), len(zs)), fontsize=SHARED_VARS.TITLE_FONTSIZE)
+            page_str = ' (page {} of {})'.format(page + 1, n_pages) if n_pages > 1 else ''
+            plt.suptitle('TARDIS Imputed Slices: {} end, {:.0f} mm extension, every {:.0f} mm ({} of {} slices), FA beside T1{}'.format(end, extent_mm, step * vox[2], len(zs_show), len(zs), page_str), fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
-        tardis_end_vis_file = os.path.join(vis_dir, 'tardis_{}.pdf'.format(end))
-        plt.savefig(tardis_end_vis_file, dpi=SHARED_VARS.PDF_DPI)
-        plt.savefig(os.path.join(qa_dir, 'tardis_{}.png'.format(end)), dpi=150)
-        plt.close()
-        tardis_vis_files.append(tardis_end_vis_file)
+            suffix = '' if n_pages == 1 else '_{}'.format(page + 1)
+            tardis_end_vis_file = os.path.join(vis_dir, 'tardis_{}{}.pdf'.format(end, suffix))
+            plt.savefig(tardis_end_vis_file, dpi=SHARED_VARS.PDF_DPI)
+            plt.savefig(os.path.join(qa_dir, 'tardis_{}{}.png'.format(end, suffix)), dpi=150)
+            plt.close()
+            tardis_vis_files.append(tardis_end_vis_file)
 
     return tardis_vis_files
+
+def _tardis_partial_str(fov):
+
+    # Acquired edge slices that were regenerated because they were only partly valid across volumes
+    # (e.g. cut off in some scans after eddy's inter-scan alignment). Older fov.json files lack these keys.
+
+    n_inf = fov.get('n_partial_inferior', 0)
+    n_sup = fov.get('n_partial_superior', 0)
+    if n_inf + n_sup == 0:
+        return 'No acquired edge slice fell below {:.0%} valid brain voxels across all volumes.\n'.format(fov.get('coverage_frac', 0.9))
+    partial = fov.get('partial_slices', {})
+    fracs = ', '.join('z{}: {:.0%}'.format(z, partial[z]['valid_frac']) for z in sorted(partial, key=int))
+    return 'Of these, {} inferior and {} superior slices were acquired but only partly valid across volumes (cut off in some scans after inter-scan alignment) and were regenerated as well. Valid brain fraction per slice: {}.\n'.format(n_inf, n_sup, fracs)
