@@ -1195,7 +1195,7 @@ def _methods_strs(use_topup, use_synb0, params):
     c += 1
 
     if params.get('use_tardis', False):
-        s.append('As an additional step, the superior and inferior brain slices cut off by the diffusion acquisition field of view were regenerated with TARDIS, a conditional flow-matching model by Rudravaram et al. [{}] that synthesizes diffusion ADC (or tensor) slices autoregressively from the adjacent acquired slices and the co-registered T1. The T1 was first Rician-denoised and N4 bias-field corrected with ANTs, skull-stripped with SynthStrip, and registered to the mean preprocessed b0 with epi_reg. The acquired slices were not modified; the extended data, a synthetic DWI derived from them, and their CSD or tensor fits are provided separately on the 2x2x1 mm model grid and resampled onto the native grid.'.format(c))
+        s.append('As an additional step, the superior and inferior brain slices cut off by the diffusion acquisition field of view were regenerated with TARDIS, a conditional flow-matching model by Rudravaram et al. [{}] that synthesizes diffusion ADC (or tensor) slices autoregressively from the adjacent acquired slices and the co-registered T1. The T1 was first Rician-denoised and N4 bias-field corrected with ANTs, skull-stripped with SynthStrip, and registered to the mean preprocessed b0 with epi_reg. The acquired slices were not modified; the extended data, a synthetic DWI derived from them, and their CSD or tensor fits are provided separately'.format(c))
         r.append('[{}] Rudravaram, G. et al. (2026). Generalizable field of view extension for diffusion MRI via conditional flow matching. arXiv:2610.17401.'.format(c))
         c += 1
 
