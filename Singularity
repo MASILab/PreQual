@@ -70,6 +70,14 @@ From: /nfs2/harmonization/singularities/neuro_base_with_ants.tar
     # matplotlib (all venvs) renders to files only; xvfb sets DISPLAY, which would otherwise select Tk
     export MPLBACKEND=Agg
 
+    # Keep every per-user cache inside the container's /tmp so nothing is written to (or needs) a home
+    # directory: matplotlib config/font cache, fontconfig, Qt (mrview under xvfb), uv. This lets the
+    # image run with --no-home.
+    export MPLCONFIGDIR=/tmp/prequal_mpl
+    export XDG_CACHE_HOME=/tmp/prequal_cache
+    export XDG_RUNTIME_DIR=/tmp/prequal_runtime
+    export UV_CACHE_DIR=/tmp/prequal_uv
+
     export TMPDIR=/tmp
     export PATH="/opt/ants/bin:/opt/mrtrix3/bin:${FSLDIR}/bin:${FREESURFER_HOME}/bin:/APPS/c3d-1.0.0-Linux-x86_64/bin:/opt/uv:${PATH}"
 
@@ -179,6 +187,9 @@ From: /nfs2/harmonization/singularities/neuro_base_with_ants.tar
 
 %runscript
 
+    mkdir -p "$MPLCONFIGDIR" "$XDG_CACHE_HOME" "$XDG_RUNTIME_DIR" "$UV_CACHE_DIR" 2>/dev/null
+    chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null
+    cd /tmp # never run from the (possibly bound) home directory: MRtrix scripts default their scratch to the cwd
     xvfb-run -a --server-args="-screen 0 1600x1280x24 -ac" bash /CODE/run_dtiQA.sh /INPUTS /OUTPUTS "$@"
 
 %test

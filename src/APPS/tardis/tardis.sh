@@ -2,6 +2,10 @@
 # TARDIS FOV extension inside PreQual.
 #
 # Usage: tardis.sh <dwi.nii.gz> <dwi.bval> <dwi.bvec> <t1.nii.gz> <out_dir> <num_threads>
+#                  [<mask.nii.gz> <tensor.nii.gz> <fa.nii.gz> <md.nii.gz>]
+#
+# With the four optional native PreQual files, composite volumes (native metric where acquired, TARDIS
+# where regenerated, on the padded native grid) are written to <out_dir>/native for the PDF and for users.
 #
 # Regenerates the superior/inferior brain slices cut off by the diffusion acquisition with the TARDIS
 # rectified-flow models (FOD model for shells with >= 28 directions, tensor model otherwise), writes
@@ -20,6 +24,10 @@ BVEC=$3
 T1=$4
 OUT=$5
 THREADS=${6:-1}
+NATIVE_MASK=${7:-}
+NATIVE_TENSOR=${8:-}
+NATIVE_FA=${9:-}
+NATIVE_MD=${10:-}
 
 TARDIS_HOME=${TARDIS_HOME:-/APPS/tardis}
 PY=${TARDIS_PY:-$TARDIS_HOME/venv/bin/python}
@@ -176,6 +184,17 @@ log "primary output: $PRIMARY"
 # ── 8. native-grid outputs ───────────────────────────────────────────────────
 log "=== 8/8 resampling the extended data onto the native DWI grid ==="
 "$PY" "$TARDIS_HOME/005_native_outputs.py" --dwi "$DWI" --tardis-dir "$OUT" --primary-dir "$PRIMARY_DIR" --out-dir "$OUT/native"
+
+# ── 9. composites: PreQual metric where acquired, TARDIS where regenerated (padded native grid) ──
+if [[ -n "$NATIVE_MASK" && -f "$NATIVE_MASK" && -f "$NATIVE_TENSOR" && -f "$NATIVE_FA" && -f "$NATIVE_MD" ]]; then
+    log "=== 9/9 composite volumes on the padded native grid ==="
+    "$PY" "$TARDIS_HOME/006_composite_outputs.py" --dwi "$DWI" --bval "$BVAL" --mask "$NATIVE_MASK" --tensor "$NATIVE_TENSOR" \
+        --fa "$NATIVE_FA" --md "$NATIVE_MD" --tardis-dir "$OUT" --native-dir "$OUT/native"
+    tensor2metric "$OUT/native/tensor_composite.nii.gz" -vector "$OUT/native/v1_composite.nii.gz" -num 1 -modulate none \
+        -mask "$OUT/native/mask_composite.nii.gz" -nthreads "$THREADS" -force -quiet
+else
+    log "=== 9/9 composites skipped (native mask/tensor/FA/MD not given) ==="
+fi
 
 rm -rf "$WORK"
 log "done. see $OUT/summary.txt"

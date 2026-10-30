@@ -256,7 +256,7 @@ def vis_synb0(b0_d_file, t1_file, b0_syn_file, vis_dir):
 
     return synb0_vis_file
 
-def vis_preproc(dwi_files, bvals_files, dwi_preproc_file, bvals_preproc_file, eddy_mask_file, mask_file, percent_improbable, stats_mask_file, vis_dir):
+def vis_preproc(dwi_files, bvals_files, dwi_preproc_file, bvals_preproc_file, eddy_mask_file, mask_file, percent_improbable, stats_mask_file, vis_dir, fov=None):
 
     print('VISUALIZING RAW AND PREPROCESSED DATA + MASKS')
 
@@ -298,26 +298,42 @@ def vis_preproc(dwi_files, bvals_files, dwi_preproc_file, bvals_preproc_file, ed
             plt.ylabel('Axial', fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     b0_preproc_file, _, _ = utils.dwi_extract(dwi_preproc_file, bvals_preproc_file, temp_dir, target_bval=0, first_only=True)
-    b0_preproc_slices, b0_preproc_vox_dim, b0_preproc_min, b0_preproc_max = utils.slice_nii(b0_preproc_file, min_intensity=0, max_percentile=SHARED_VARS.VIS_PERCENTILE_MAX)
 
-    mask_slices, _, _, _ = utils.slice_nii(mask_file)
-    stats_mask_slices, _, _, _ = utils.slice_nii(stats_mask_file)
+    fov_markers = None
+    center_vol_file = None
+    if fov is not None: # padded grid: native b0 (not extended), composite mask (TARDIS brain mask in the regenerated slices)
+        b0_preproc_file = utils.pad_to_fov(b0_preproc_file, fov, temp_dir)
+        mask_file = fov['mask']
+        stats_mask_file = utils.pad_to_fov(stats_mask_file, fov, temp_dir)
+        center_vol_file = fov['acquired']
+        fov_markers = utils.fov_marker_slices(fov)
+
+    b0_preproc_slices, b0_preproc_vox_dim, b0_preproc_min, b0_preproc_max = utils.slice_nii(b0_preproc_file, min_intensity=0, max_percentile=SHARED_VARS.VIS_PERCENTILE_MAX, center_vol_file=center_vol_file)
+
+    mask_slices, _, _, _ = utils.slice_nii(mask_file, center_vol_file=center_vol_file)
+    stats_mask_slices, _, _, _ = utils.slice_nii(stats_mask_file, center_vol_file=center_vol_file)
 
     plt.subplot(5, num_dwi+1, num_dwi+1)
     utils.plot_slice(slices=b0_preproc_slices, img_dim=0, offset_index=0, vox_dim=b0_preproc_vox_dim, img_min=b0_preproc_min, img_max=b0_preproc_max)
     utils.plot_slice_contour(slices=mask_slices, img_dim=0, offset_index=0, color='c')
     utils.plot_slice_contour(slices=stats_mask_slices, img_dim=0, offset_index=0, color='m')
+    if fov_markers is not None:
+        utils.plot_fov_line(fov_markers[0], img_dim=0, offset_index=0, vox_dim=b0_preproc_vox_dim)
     plt.title('Preprocessed', fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     plt.subplot(5, num_dwi+1, 2*(num_dwi+1))
     utils.plot_slice(slices=b0_preproc_slices, img_dim=1, offset_index=0, vox_dim=b0_preproc_vox_dim, img_min=b0_preproc_min, img_max=b0_preproc_max)
     utils.plot_slice_contour(slices=mask_slices, img_dim=1, offset_index=0, color='c')
     utils.plot_slice_contour(slices=stats_mask_slices, img_dim=1, offset_index=0, color='m')
+    if fov_markers is not None:
+        utils.plot_fov_line(fov_markers[0], img_dim=1, offset_index=0, vox_dim=b0_preproc_vox_dim)
 
     plt.subplot(5, num_dwi+1, 3*(num_dwi+1))
     utils.plot_slice(slices=b0_preproc_slices, img_dim=2, offset_index=0, vox_dim=b0_preproc_vox_dim, img_min=b0_preproc_min, img_max=b0_preproc_max)
     utils.plot_slice_contour(slices=mask_slices, img_dim=2, offset_index=0, color='c')
     utils.plot_slice_contour(slices=stats_mask_slices, img_dim=2, offset_index=0, color='m')
+    if fov_markers is not None:
+        utils.plot_fov_frame(fov_markers[1], offset_index=0)
 
     plt.tight_layout()
 
@@ -336,6 +352,8 @@ def vis_preproc(dwi_files, bvals_files, dwi_preproc_file, bvals_preproc_file, ed
     plt.plot([], linewidth=2, color='r', label='Eddy Mask')
     plt.plot([], linewidth=2, color='c', label='Preprocessed Mask ({:.2f}% Voxels Improbable)'.format(percent_improbable))
     plt.plot([], linewidth=2, color='m', label=r'$\chi^2$' ' Mask')
+    if fov is not None:
+        plt.plot([], linewidth=2, color='blue', label='TARDIS FOV extension starts (b0 not extended; mask = TARDIS brain mask beyond)')
     plt.legend(bbox_to_anchor=(0.5, 0.5), loc='center', ncol=1)
     legend_ax.axis('off')
 
@@ -942,7 +960,7 @@ def vis_gradcheck(bvals_files, bvecs_files, bvals_preproc_file, bvecs_preproc_fi
 
     return gradcheck_vis_file
 
-def vis_dwi(dwi_file, bvals_shelled, bvecs_file, cnr_dict, vis_dir):
+def vis_dwi(dwi_file, bvals_shelled, bvecs_file, cnr_dict, vis_dir, fov=None):
 
     print('VISUALIZING DWI')
 
@@ -951,6 +969,8 @@ def vis_dwi(dwi_file, bvals_shelled, bvecs_file, cnr_dict, vis_dir):
     dwi_vis_files = []
     
     bvals = np.sort(np.unique(bvals_shelled))
+    offsets = [-10, -5, 0, 5, 10]
+    fov_markers = utils.fov_marker_slices(fov, offsets=offsets) if fov is not None else None
 
     for i in range(len(bvals)):
 
@@ -959,12 +979,26 @@ def vis_dwi(dwi_file, bvals_shelled, bvecs_file, cnr_dict, vis_dir):
         bX = bvals[i]
         bXs_file, num_bXs, _ = utils.dwi_extract(dwi_file, bvals_shelled_file, temp_dir, target_bval=bX, first_only=False)
         bXs_avg_file = utils.dwi_avg(bXs_file, temp_dir)
-        bXs_avg_slices, bXs_avg_vox_dim, bXs_avg_min, bXs_avg_max = utils.slice_nii(bXs_avg_file, offsets=[-10, -5, 0, 5, 10], min_intensity=0, max_percentile=SHARED_VARS.VIS_PERCENTILE_MAX)
+
+        comment = ''
+        if fov is not None:
+            # TARDIS-processed shell: composite mean image (native where acquired, scaled synthetic where regenerated).
+            # b0 and other shells: native data on the padded grid (black beyond the blue line).
+            shell_file = utils.fov_shell_file(fov, bX)
+            if shell_file is not None:
+                bXs_avg_file = shell_file
+                comment = 'TARDIS-extended beyond the blue line'
+            else:
+                bXs_avg_file = utils.pad_to_fov(bXs_avg_file, fov, temp_dir)
+                comment = 'not extended by TARDIS; blue line: FOV extension starts'
+            bXs_avg_slices, bXs_avg_vox_dim, bXs_avg_min, bXs_avg_max = utils.slice_nii(bXs_avg_file, offsets=offsets, min_intensity=0, max_percentile=SHARED_VARS.VIS_PERCENTILE_MAX, center_vol_file=fov['acquired'])
+        else:
+            bXs_avg_slices, bXs_avg_vox_dim, bXs_avg_min, bXs_avg_max = utils.slice_nii(bXs_avg_file, offsets=offsets, min_intensity=0, max_percentile=SHARED_VARS.VIS_PERCENTILE_MAX)
         
         cnr = '{:.3f}'.format(cnr_dict[bX])
         cnr_label = 'SNR' if bX == 0 else 'CNR'
 
-        bXs_vis_file = _vis_vol(bXs_avg_slices, bXs_avg_vox_dim, bXs_avg_min, bXs_avg_max, vis_dir, name='Preprocessed_b_=_{},_{}_scan_average,_{}_=_{}'.format(bX, num_bXs, cnr_label, cnr), colorbar=False)
+        bXs_vis_file = _vis_vol(bXs_avg_slices, bXs_avg_vox_dim, bXs_avg_min, bXs_avg_max, vis_dir, name='Preprocessed_b_=_{},_{}_scan_average,_{}_=_{}'.format(bX, num_bXs, cnr_label, cnr), comment=comment, colorbar=False, fov_markers=fov_markers)
         dwi_vis_files.append(bXs_vis_file)
 
         bvals_shelled_file.close()
@@ -974,7 +1008,7 @@ def vis_dwi(dwi_file, bvals_shelled, bvecs_file, cnr_dict, vis_dir):
 
     return dwi_vis_files
 
-def vis_scalar(scalar_file, vis_dir, name='?', comment=''):
+def vis_scalar(scalar_file, vis_dir, name='?', comment='', fov=None):
 
     print('VISUALIZING {} SCALAR MAP'.format(name))
     
@@ -983,20 +1017,38 @@ def vis_scalar(scalar_file, vis_dir, name='?', comment=''):
         scalar_max = 1
     elif name == 'MD':
         scalar_max = SHARED_VARS.ADC_WATER
-    
-    scalar_slices, scalar_vox_dim, _, _ = utils.slice_nii(scalar_file, offsets=[-10, -5, 0, 5, 10])
-    scalar_vis_file = _vis_vol(scalar_slices, scalar_vox_dim, scalar_min, scalar_max, vis_dir, name=name, comment=comment, colorbar=True)
+
+    offsets = [-10, -5, 0, 5, 10]
+    fov_markers = None
+    if fov is not None: # TARDIS composite: native where acquired, TARDIS where regenerated; blue line marks the boundary
+        scalar_file = fov[name.lower()]
+        scalar_slices, scalar_vox_dim, _, _ = utils.slice_nii(scalar_file, offsets=offsets, center_vol_file=fov['acquired'])
+        fov_markers = utils.fov_marker_slices(fov, offsets=offsets)
+        comment = '{}; blue line: TARDIS FOV extension starts'.format(comment) if comment != '' else 'blue line: TARDIS FOV extension starts'
+    else:
+        scalar_slices, scalar_vox_dim, _, _ = utils.slice_nii(scalar_file, offsets=offsets)
+    scalar_vis_file = _vis_vol(scalar_slices, scalar_vox_dim, scalar_min, scalar_max, vis_dir, name=name, comment=comment, colorbar=True, fov_markers=fov_markers)
     
     return scalar_vis_file
 
-def vis_fa_stats(roi_names, roi_med_fa, fa_file, atlas_ants_fa_file, vis_dir):
+def vis_fa_stats(roi_names, roi_med_fa, fa_file, atlas_ants_fa_file, vis_dir, fov=None):
 
     print('VISUALIZING FA STATISTICS')
 
-    fa_slices, fa_vox_dim, _, _ = utils.slice_nii(fa_file)
+    fov_markers = None
+    if fov is not None: # composite FA with the atlas padded onto the same grid
+        temp_dir = utils.make_dir(vis_dir, 'TEMP')
+        fa_file = fov['fa']
+        atlas_ants_fa_file = utils.pad_to_fov(atlas_ants_fa_file, fov, temp_dir)
+        center_vol_file = fov['acquired']
+        fov_markers = utils.fov_marker_slices(fov)
+    else:
+        center_vol_file = None
+
+    fa_slices, fa_vox_dim, _, _ = utils.slice_nii(fa_file, center_vol_file=center_vol_file)
     _, fa_aff, _ = utils.load_nii(fa_file)
 
-    atlas_slices, atlas_vox_dim, _, _ = utils.slice_nii(atlas_ants_fa_file, custom_aff=fa_aff) # Using fa affine because atlas has been registered to fa and should have voxel correspondence with same affine, but ants seems to have some rounding error. Only a problem on edge cases (i.e. rotated 45° exactly)
+    atlas_slices, atlas_vox_dim, _, _ = utils.slice_nii(atlas_ants_fa_file, custom_aff=fa_aff, center_vol_file=center_vol_file) # Using fa affine because atlas has been registered to fa and should have voxel correspondence with same affine, but ants seems to have some rounding error. Only a problem on edge cases (i.e. rotated 45° exactly)
 
     overlay_colormap = mcm.jet
     overlay_colormap.set_under('k', alpha=0)
@@ -1012,17 +1064,23 @@ def vis_fa_stats(roi_names, roi_med_fa, fa_file, atlas_ants_fa_file, vis_dir):
     plt.subplot(3, 2, 2)
     utils.plot_slice(slices=fa_slices, img_dim=0, offset_index=0, vox_dim=fa_vox_dim, img_min=0, img_max=1)
     utils.plot_slice(slices=atlas_slices, img_dim=0, offset_index=0, vox_dim=atlas_vox_dim, img_min=1, img_max=len(roi_names), alpha=0.5, cmap=overlay_colormap)
-    plt.title('FA ROI Alignment', fontsize=SHARED_VARS.TITLE_FONTSIZE)
+    if fov_markers is not None:
+        utils.plot_fov_line(fov_markers[0], img_dim=0, offset_index=0, vox_dim=fa_vox_dim)
+    plt.title('FA ROI Alignment{}'.format('' if fov is None else ' (blue line: TARDIS FOV extension starts)'), fontsize=SHARED_VARS.TITLE_FONTSIZE if fov is None else SHARED_VARS.LABEL_FONTSIZE)
     plt.ylabel('Sagittal', fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     plt.subplot(3, 2, 4)
     utils.plot_slice(slices=fa_slices, img_dim=1, offset_index=0, vox_dim=fa_vox_dim, img_min=0, img_max=1)
     utils.plot_slice(slices=atlas_slices, img_dim=1, offset_index=0, vox_dim=atlas_vox_dim, img_min=1, img_max=len(roi_names), alpha=0.5, cmap=overlay_colormap)
+    if fov_markers is not None:
+        utils.plot_fov_line(fov_markers[0], img_dim=1, offset_index=0, vox_dim=fa_vox_dim)
     plt.ylabel('Coronal', fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     plt.subplot(3, 2, 6)
     utils.plot_slice(slices=fa_slices, img_dim=2, offset_index=0, vox_dim=fa_vox_dim, img_min=0, img_max=1)
     utils.plot_slice(slices=atlas_slices, img_dim=2, offset_index=0, vox_dim=atlas_vox_dim, img_min=1, img_max=len(roi_names), alpha=0.5, cmap=overlay_colormap)
+    if fov_markers is not None:
+        utils.plot_fov_frame(fov_markers[1], offset_index=0)
     plt.ylabel('Axial', fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     plt.tight_layout()
@@ -1031,13 +1089,27 @@ def vis_fa_stats(roi_names, roi_med_fa, fa_file, atlas_ants_fa_file, vis_dir):
     plt.savefig(fa_stats_vis_file, dpi=SHARED_VARS.PDF_DPI)
     plt.close()
 
+    if fov is not None:
+        utils.remove_dir(temp_dir)
+
     return fa_stats_vis_file
 
-def vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_type='tensor'):
+def vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_type='tensor', fov=None):
 
     print('VISUALIZING TENSORS')
 
     temp_dir = utils.make_dir(vis_dir, 'TEMP')
+
+    # TARDIS composites: tensor/V1/FA on the padded grid, CC center shifted accordingly, and the boundary
+    # plane overlaid in blue by mrview
+
+    fov_overlay_str = ''
+    if fov is not None:
+        tensor_file = fov['tensor']
+        v1_file = fov['v1']
+        fa_file = fov['fa']
+        cc_center_voxel = utils.fov_voxel(cc_center_voxel, fov)
+        fov_overlay_str = '-overlay.load {} -overlay.colour 0,0,255 -overlay.threshold_min 0.5 -overlay.opacity 1 -overlay.interpolation 0'.format(fov['boundary'])
 
     # Prepare mrview command: Location to visualize
 
@@ -1068,12 +1140,12 @@ def vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_ty
     # Generate mrview commands and plot glyphs
 
     for i in planes:
-        vis_cmd = 'mrview -load {} {} {} -mode 1 -plane {} -fov 160 -voxel {} -focus 0 -size 1200,1200 -capture.folder {} -capture.prefix {} -capture.grab -noannotations -exit -nthreads {}'.format(
-            fa_file, glyph_load_str, glyph_file, i, cc_center_voxel_str, temp_dir, planes[i], SHARED_VARS.NUM_THREADS-1
+        vis_cmd = 'mrview -load {} {} {} {} -mode 1 -plane {} -fov 160 -voxel {} -focus 0 -size 1200,1200 -capture.folder {} -capture.prefix {} -capture.grab -noannotations -exit -nthreads {}'.format(
+            fa_file, glyph_load_str, glyph_file, fov_overlay_str, i, cc_center_voxel_str, temp_dir, planes[i], SHARED_VARS.NUM_THREADS-1
         )
         utils.run_cmd(vis_cmd) # will save as '<planes[i]>0000.png'
-        vis_zoom_cmd = 'mrview -load {} {} {} -mode 1 -plane {} -fov 80 -voxel {} -focus 0 -size 1200,1200 -capture.folder {} -capture.prefix {} -capture.grab -noannotations -exit -nthreads {}'.format(
-            fa_file, glyph_load_str, glyph_file, i, cc_center_voxel_str, temp_dir, '{}_zoom'.format(planes[i]), SHARED_VARS.NUM_THREADS-1 # will save as 'planes[i]_zoom0000.png'
+        vis_zoom_cmd = 'mrview -load {} {} {} {} -mode 1 -plane {} -fov 80 -voxel {} -focus 0 -size 1200,1200 -capture.folder {} -capture.prefix {} -capture.grab -noannotations -exit -nthreads {}'.format(
+            fa_file, glyph_load_str, glyph_file, fov_overlay_str, i, cc_center_voxel_str, temp_dir, '{}_zoom'.format(planes[i]), SHARED_VARS.NUM_THREADS-1 # will save as 'planes[i]_zoom0000.png'
         )
         utils.run_cmd(vis_zoom_cmd)
 
@@ -1120,7 +1192,7 @@ def vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_ty
 
     plt.tight_layout()
 
-    plt.suptitle('{} (Non-physiologic Eigenvalues Omitted)'.format(glyph_title_str), fontsize=SHARED_VARS.TITLE_FONTSIZE)
+    plt.suptitle('{} (Non-physiologic Eigenvalues Omitted{})'.format(glyph_title_str, '' if fov is None else '; blue line: TARDIS FOV extension starts'), fontsize=SHARED_VARS.TITLE_FONTSIZE if fov is None else SHARED_VARS.LABEL_FONTSIZE)
     plt.savefig(glyph_vis_file, dpi=SHARED_VARS.PDF_DPI)
     plt.close()
 
@@ -1231,7 +1303,10 @@ def _methods_strs(use_topup, use_synb0, params):
 
     return s, r
 
-def _vis_vol(slices, vox_dim, min, max, vis_dir, name='?', comment='', colorbar=False):
+def _vis_vol(slices, vox_dim, min, max, vis_dir, name='?', comment='', colorbar=False, fov_markers=None):
+
+    # fov_markers: (boundary_slices, regen_slices) from utils.fov_marker_slices, drawn as a blue line
+    # (sagittal/coronal) and a blue frame on regenerated axial slices
 
     title = name.replace('_', ' ')
     if not comment == '':
@@ -1245,6 +1320,8 @@ def _vis_vol(slices, vox_dim, min, max, vis_dir, name='?', comment='', colorbar=
 
         plt.subplot(3, 5, i+1)
         utils.plot_slice(slices=slices, img_dim=0, offset_index=i, vox_dim=vox_dim, img_min=min, img_max=max)
+        if fov_markers is not None:
+            utils.plot_fov_line(fov_markers[0], img_dim=0, offset_index=i, vox_dim=vox_dim)
         if i == 0:
             plt.xlabel('Right-most Slice', fontsize=SHARED_VARS.LABEL_FONTSIZE / 2)
         if i == 2:
@@ -1255,6 +1332,8 @@ def _vis_vol(slices, vox_dim, min, max, vis_dir, name='?', comment='', colorbar=
 
         plt.subplot(3, 5, i+1 + 5)
         utils.plot_slice(slices=slices, img_dim=1, offset_index=i, vox_dim=vox_dim, img_min=min, img_max=max)
+        if fov_markers is not None:
+            utils.plot_fov_line(fov_markers[0], img_dim=1, offset_index=i, vox_dim=vox_dim)
         if i == 0:
             plt.xlabel('Posterior-most Slice', fontsize=SHARED_VARS.LABEL_FONTSIZE / 2)
         if i == 2:
@@ -1265,6 +1344,8 @@ def _vis_vol(slices, vox_dim, min, max, vis_dir, name='?', comment='', colorbar=
 
         plt.subplot(3, 5, i+1 + 10)
         im = utils.plot_slice(slices=slices, img_dim=2, offset_index=i, vox_dim=vox_dim, img_min=min, img_max=max)
+        if fov_markers is not None:
+            utils.plot_fov_frame(fov_markers[1], offset_index=i)
         if i == 0:
             plt.xlabel('Inferior-most Slice', fontsize=SHARED_VARS.LABEL_FONTSIZE / 2)
         if i == 2:

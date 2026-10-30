@@ -380,14 +380,16 @@ def scalars(tensor_file, mask_file, scalars_dir):
 
     return fa_file, md_file, ad_file, rd_file, v1_file
 
-def tardis(dwi_file, bvals_file, bvecs_file, t1_file, tardis_dir, num_threads):
+def tardis(dwi_file, bvals_file, bvecs_file, t1_file, tardis_dir, num_threads, mask_file, tensor_file, fa_file, md_file):
 
     # TARDIS FOV extension (see /APPS/tardis/tardis.sh). This is an add-on stage: it never fails the
     # pipeline. Returns (success, warning_str). Exit code 3 means no shell had enough directions.
+    # The native mask/tensor/FA/MD let TARDIS write composite volumes (native where acquired, TARDIS where
+    # regenerated) that the PDF uses for every brain figure.
 
     print('RUNNING TARDIS FOV EXTENSION WITH {} ...'.format(t1_file))
 
-    tardis_cmd = 'bash {} {} {} {} {} {} {}'.format(SHARED_VARS.TARDIS_EXEC_FILE, dwi_file, bvals_file, bvecs_file, t1_file, tardis_dir, num_threads)
+    tardis_cmd = 'bash {} {} {} {} {} {} {} {} {} {} {}'.format(SHARED_VARS.TARDIS_EXEC_FILE, dwi_file, bvals_file, bvecs_file, t1_file, tardis_dir, num_threads, mask_file, tensor_file, fa_file, md_file)
     print('RUNNING: {}'.format(tardis_cmd))
     rc = subprocess.call(tardis_cmd, shell=True)
 

@@ -57,7 +57,7 @@ Example `dtiQA_config.csv` for two forward scans and one reverse phase-encoded s
       PDF/dtiQA.pdf                                        quality assurance report
       TARDIS/                                              field-of-view extension (if a T1 was supplied)
 
-All other folders are described under [Outputs](docs/USER_GUIDE.md#outputs).
+Every output folder and file, and which ones you need: [Outputs](docs/OUTPUTS.md). How to read the report: [How to QA](docs/QA_GUIDE.md).
 
 ## Common options
 

@@ -757,7 +757,11 @@ def pescheme2axis(pe_axis, pe_dir, aff):
 
 # Function Definitions: Visualization
 
-def slice_nii(nii_file, offsets=[0], custom_aff=[], min_percentile=0, max_percentile=100, min_intensity=np.nan, max_intensity=np.nan, det=False):
+def slice_nii(nii_file, offsets=[0], custom_aff=[], min_percentile=0, max_percentile=100, min_intensity=np.nan, max_intensity=np.nan, det=False, center_vol_file=None):
+
+    # center_vol_file: optional mask on the same grid; the triplanar center is then the midpoint of its
+    # extent per axis instead of the image center (used to keep the TARDIS-padded volumes centered on the
+    # acquired data).
 
     if det:
         img, aff, hdr = load_nii(nii_file, ndim=4)
@@ -788,6 +792,15 @@ def slice_nii(nii_file, offsets=[0], custom_aff=[], min_percentile=0, max_percen
     i0 = int(round(img.shape[0] / 2, 1))
     i1 = int(round(img.shape[1] / 2, 1))
     i2 = int(round(img.shape[2] / 2, 1))
+
+    if center_vol_file is not None:
+        cimg, caff, chdr = load_nii(center_vol_file, ndim=3)
+        cimg, _ = _radiological_view(cimg, aff if len(custom_aff) == 0 else custom_aff, chdr.get_zooms())
+        nz = np.where(cimg > 0.5)
+        if len(nz[0]) > 0:
+            i0 = int((nz[0].min() + nz[0].max()) / 2)
+            i1 = int((nz[1].min() + nz[1].max()) / 2)
+            i2 = int((nz[2].min() + nz[2].max()) / 2)
 
     # Offsets are requested in voxels around the center slice. When an axis has fewer slices than the
     # requested span (thick slices, few slices), scale the offsets down so that they stay inside the
@@ -996,3 +1009,113 @@ def det_matrix(l):
                                 L_mat = np.squeeze(vL[:,:,x,y,z])
                                 L_det[x,y,z] = np.linalg.det(L_mat[:,:])
         return L_det
+
+# TARDIS composites: show the FOV-extended data on every brain figure
+
+def load_tardis_composites(tardis_dir):
+
+    # Returns a dict describing the composite volumes TARDIS wrote (native metric where acquired, TARDIS
+    # where regenerated, on the padded native grid), or None if they are not there.
+
+    import json
+
+    composite_file = os.path.join(tardis_dir, 'native', 'composite.json')
+    if not os.path.exists(composite_file):
+        return None
+    with open(composite_file) as f:
+        meta = json.load(f)
+    native_dir = os.path.join(tardis_dir, 'native')
+    fov = {
+        'slice_axis': int(meta['slice_axis']),
+        'pad_before': int(meta['pad_before']),
+        'padded_shape': [int(s) for s in meta['padded_shape']],
+        'affine': np.array(meta['affine']),
+        'acquired_range': meta['acquired_range'],
+        'regenerated_slices': meta['regenerated_slices'],
+        'boundary_slices': meta['boundary_slices'],
+        'shells': {},
+    }
+    for key, fname in meta['files'].items():
+        fov[key] = os.path.join(native_dir, fname)
+    for s in meta['shells']:
+        fov['shells'][float(s['label'])] = os.path.join(native_dir, s['file'])
+    for key in ('fa', 'md', 'tensor', 'v1', 'mask', 'boundary', 'regenerated', 'acquired'):
+        if not os.path.exists(fov[key]):
+            print('WARNING: TARDIS COMPOSITE {} NOT FOUND, PDF WILL USE NATIVE DATA'.format(fov[key]))
+            return None
+    return fov
+
+def fov_shell_file(fov, bval, tol=0.1):
+
+    # The composite mean image of the TARDIS-processed shell matching this b-value, or None
+
+    if fov is None:
+        return None
+    for label, shell_file in fov['shells'].items():
+        if label > 0 and abs(label - float(bval)) <= tol * max(label, 1):
+            return shell_file
+    return None
+
+def pad_to_fov(nii_file, fov, out_dir, dtype=''):
+
+    # Embed a native-grid image into the padded TARDIS grid (zeros in the extension) so that native-only
+    # images line up with the composites and get the same FOV marking.
+
+    img, _, _ = load_nii(nii_file)
+    if dtype != '':
+        img = img.astype(dtype)
+    shape = tuple(fov['padded_shape']) + tuple(img.shape[3:])
+    out = np.zeros(shape, dtype=img.dtype)
+    sl = [slice(None)] * 3
+    sl[fov['slice_axis']] = slice(fov['pad_before'], fov['pad_before'] + img.shape[fov['slice_axis']])
+    out[tuple(sl)] = img
+    padded_file = os.path.join(out_dir, '{}_fovpad.nii.gz'.format(get_prefix(nii_file)))
+    save_nii(out, fov['affine'], padded_file)
+    return padded_file
+
+def fov_voxel(voxel, fov):
+
+    # Shift a native voxel coordinate onto the padded grid
+
+    shifted = list(voxel)
+    shifted[fov['slice_axis']] = shifted[fov['slice_axis']] + fov['pad_before']
+    return shifted
+
+def fov_marker_slices(fov, offsets=[0]):
+
+    # Slices (same reorientation/centering as the images) of the boundary planes and the regenerated slab,
+    # for plot_fov_line / plot_fov_frame.
+
+    boundary_slices, _, _, _ = slice_nii(fov['boundary'], offsets=offsets, center_vol_file=fov['acquired'])
+    regen_slices, _, _, _ = slice_nii(fov['regenerated'], offsets=offsets, center_vol_file=fov['acquired'])
+    return boundary_slices, regen_slices
+
+def plot_fov_line(boundary_slices, img_dim, offset_index, vox_dim, color='blue'):
+
+    # Blue line where the TARDIS extension starts (sagittal/coronal views only: img_dim 0 or 1)
+
+    if img_dim == 2:
+        return
+    s = boundary_slices[img_dim]
+    if img_dim == 0:
+        s = s[offset_index, :, :]
+        vox_ratio = vox_dim[2]/vox_dim[1]
+    else:
+        s = s[:, offset_index, :]
+        vox_ratio = vox_dim[2]/vox_dim[0]
+    s = np.rot90(np.squeeze(s))
+    rows = np.where(np.any(s > 0.5, axis=1))[0]
+    for row in rows:
+        plt.axhline(row, color=color, linewidth=1.2)
+
+def plot_fov_frame(regen_slices, offset_index, color='blue'):
+
+    # Axial view of a regenerated slice: blue frame and label
+
+    s = regen_slices[2][:, :, offset_index]
+    if np.any(s > 0.5):
+        ax = plt.gca()
+        for spine in ax.spines.values():
+            spine.set_edgecolor(color)
+            spine.set_linewidth(2.5)
+        plt.text(0.03, 0.03, 'TARDIS', color=color, fontsize=SHARED_VARS.LABEL_FONTSIZE / 2, transform=ax.transAxes, ha='left', va='bottom', fontweight='bold')

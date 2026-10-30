@@ -827,13 +827,18 @@ def main():
 
     if use_tardis:
         tardis_dir = utils.make_dir(out_dir, 'TARDIS')
-        tardis_success, tardis_warning_str = preproc.tardis(dwi_preproc_file, bvals_preproc_file, bvecs_preproc_file, t1_sform_file, tardis_dir, SHARED_VARS.NUM_THREADS)
+        tardis_success, tardis_warning_str = preproc.tardis(dwi_preproc_file, bvals_preproc_file, bvecs_preproc_file, t1_sform_file, tardis_dir, SHARED_VARS.NUM_THREADS, mask_file, tensor_file, fa_file, md_file)
         if not tardis_success:
             warning_strs.append(tardis_warning_str)
             use_tardis = False
             params['use_tardis'] = False
     else:
         print('SKIPPING TARDIS FOV EXTENSION ({})'.format('no T1 provided' if params['use_tardis_user'] else 'turned off'))
+
+    # Composite volumes (native where acquired, TARDIS where regenerated) drive every brain figure in the PDF
+    fov = utils.load_tardis_composites(tardis_dir) if use_tardis else None
+    if use_tardis and fov is None:
+        warning_strs.append('TARDIS ran but its composite volumes were not found, so the PDF shows the native (unextended) data.')
 
     tf = time.time()
     dt = round(tf - ti)
@@ -870,7 +875,7 @@ def main():
     prenorm_vis_file = utils.rename_file(prenorm_vis_file, os.path.join(vis_dir, 'prenorm.pdf'))
     if params['use_postnormalize']:
         norm_vis_file = vis.vis_norm(dwi_eddy_files, dwi_norm_files, dwi_norm_gains, dwi_norm_bins, dwi_eddy_hists, dwi_normed_hists, 'Postnormalization', vis_dir)
-    preproc_vis_file = vis.vis_preproc(dwi_checked_files, bvals_checked_files, dwi_preproc_file, bvals_preproc_file, eddy_mask_file, mask_file, percent_improbable, chisq_mask_file, vis_dir)
+    preproc_vis_file = vis.vis_preproc(dwi_checked_files, bvals_checked_files, dwi_preproc_file, bvals_preproc_file, eddy_mask_file, mask_file, percent_improbable, chisq_mask_file, vis_dir, fov=fov)
     stats_vis_file = vis.vis_stats(dwi_preproc_file, bvals_preproc_file, mask_file, chisq_matrix_file, motion_dict, eddy_dir, vis_dir)
     gradcheck_vis_file = vis.vis_gradcheck(bvals_checked_files, bvecs_checked_files, bvals_preproc_file, bvecs_preproc_file, bvals_corrected_file, bvecs_corrected_file, vis_dir)
     if params['use_unbias']:
@@ -879,11 +884,11 @@ def main():
         grad_vis_file = vis.vis_grad(bvals_unbiased_file, bvals_preproc_shelled, dwi_grad_corrected_file, resmaple_gradtensor_file, gradtensor_fa_file, mask_file, vis_dir)
     if use_tardis:
         tardis_vis_files = vis.vis_tardis(tardis_dir, vis_dir)
-    dwi_vis_files = vis.vis_dwi(dwi_preproc_file, bvals_preproc_shelled, bvecs_preproc_file, cnr_dict, vis_dir)
-    glyph_vis_file = vis.vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_type=params['glyph_type'])
-    fa_vis_file = vis.vis_scalar(fa_file, vis_dir, name='FA', comment='White matter should be bright')
-    fa_stats_vis_file = vis.vis_fa_stats(roi_names, roi_med_fa, fa_file, atlas2subj_file, vis_dir)
-    md_vis_file = vis.vis_scalar(md_file, vis_dir, name='MD', comment='CSF should be bright')
+    dwi_vis_files = vis.vis_dwi(dwi_preproc_file, bvals_preproc_shelled, bvecs_preproc_file, cnr_dict, vis_dir, fov=fov)
+    glyph_vis_file = vis.vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_type=params['glyph_type'], fov=fov)
+    fa_vis_file = vis.vis_scalar(fa_file, vis_dir, name='FA', comment='White matter should be bright', fov=fov)
+    fa_stats_vis_file = vis.vis_fa_stats(roi_names, roi_med_fa, fa_file, atlas2subj_file, vis_dir, fov=fov)
+    md_vis_file = vis.vis_scalar(md_file, vis_dir, name='MD', comment='CSF should be bright', fov=fov)
 
     # Combine component PDFs
 
