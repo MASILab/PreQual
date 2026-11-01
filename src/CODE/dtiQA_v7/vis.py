@@ -353,7 +353,7 @@ def vis_preproc(dwi_files, bvals_files, dwi_preproc_file, bvals_preproc_file, ed
     plt.plot([], linewidth=2, color='c', label='Preprocessed Mask ({:.2f}% Voxels Improbable)'.format(percent_improbable))
     plt.plot([], linewidth=2, color='m', label=r'$\chi^2$' ' Mask')
     if fov is not None:
-        plt.plot([], linewidth=2, color='blue', label='TARDIS FOV extension starts (b0 not extended; mask = TARDIS brain mask beyond)')
+        plt.plot([], linewidth=2, color='blue', label='TARDIS FOV extension starts\n(b0 not extended; mask beyond = TARDIS brain mask)')
     plt.legend(bbox_to_anchor=(0.5, 0.5), loc='center', ncol=1)
     legend_ax.axis('off')
 
@@ -1066,7 +1066,7 @@ def vis_fa_stats(roi_names, roi_med_fa, fa_file, atlas_ants_fa_file, vis_dir, fo
     utils.plot_slice(slices=atlas_slices, img_dim=0, offset_index=0, vox_dim=atlas_vox_dim, img_min=1, img_max=len(roi_names), alpha=0.5, cmap=overlay_colormap)
     if fov_markers is not None:
         utils.plot_fov_line(fov_markers[0], img_dim=0, offset_index=0, vox_dim=fa_vox_dim)
-    plt.title('FA ROI Alignment{}'.format('' if fov is None else ' (blue line: TARDIS FOV extension starts)'), fontsize=SHARED_VARS.TITLE_FONTSIZE if fov is None else SHARED_VARS.LABEL_FONTSIZE)
+    plt.title('FA ROI Alignment{}'.format('' if fov is None else '\n(blue line: TARDIS FOV extension starts)'), fontsize=SHARED_VARS.TITLE_FONTSIZE if fov is None else SHARED_VARS.LABEL_FONTSIZE)
     plt.ylabel('Sagittal', fontsize=SHARED_VARS.LABEL_FONTSIZE)
 
     plt.subplot(3, 2, 4)
