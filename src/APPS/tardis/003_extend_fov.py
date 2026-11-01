@@ -4,7 +4,7 @@
 sampled from the flow model conditioned on the n_cond slices nearer the centre (nearest last) and the target
 slice's T1 (and the shell's nominal b for the multi-b model), superior end upward and inferior end downward,
 each prediction conditioning the next. Both architectures are defined here (copied from models/).
-Inputs : OUT/work/model_input.npz, OUT/work/meta.json, OUT/fov.json, --checkpoint PT
+Inputs : OUT/work/model_input.npz, OUT/work/meta.json, OUT/LOGS/fov.json, --checkpoint PT
 Writes : OUT/work/extended.npz
 Invoke : python 003_extend_fov.py --out-dir OUT --checkpoint PT [--ode-steps N] [--device auto|cuda|cpu]
          [--seed 0] [--mask-pred] [--threads N]
@@ -334,7 +334,7 @@ def main(args):
     out = Path(args.out_dir)
     work = out / "work"
     meta = json.loads((work / "meta.json").read_text())
-    fov = json.loads((out / "fov.json").read_text())
+    fov = json.loads((out / "LOGS" / "fov.json").read_text())
     kind = meta["model"]
     if args.device == "auto":
         dev = "cuda" if torch.cuda.is_available() else "cpu"

@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 """
-005: resample the TARDIS outputs of the primary shell from the model grid (2x2x1 mm RAS) back onto the
-native preprocessed DWI grid, padded along the native slice (superior-inferior) axis so that the regenerated
-slices are kept. Voxel size and orientation of the native grid are preserved; only the slice axis grows.
-Inputs : --dwi PREPROCESSED/dwmri.nii.gz --tardis-dir OUT --primary-dir OUT/<kind>_b<label>
-Writes : OUT/native/{fa,md,adc_mean,brain_mask,regenerated_slices,dwi}_extended.nii.gz (+ .bval/.bvec/grad.txt
-         for the DWI), OUT/native/fov_native.json
-Invoke : python 005_native_outputs.py --dwi D --tardis-dir OUT --primary-dir P --out-dir OUT/native
+005: resample the extended data from the model grid onto the native DWI grid, padded along its
+superior-inferior axis so that the regenerated slices fit. Voxel size and orientation match the native
+DWI; only the slice count differs. This gives TARDIS the same shape of output as PreQual itself.
+Inputs : --dwi PREPROCESSED/dwmri.nii.gz --tardis-dir OUT (reads OUT/MODEL_SPACE/{dwmri_extended.*,brain_mask,
+         regenerated_slices,T1w}.nii.gz and OUT/LOGS/fov.json)
+Writes : OUT/PREPROCESSED/dwmri_extended.{nii.gz,bval,bvec}, dwmri_extended_grad.txt, mask_extended.nii.gz,
+         regenerated_slices.nii.gz, OUT/LOGS/fov_native.json
+Invoke : python 005_native_outputs.py --dwi D --tardis-dir OUT
 """
 import argparse
 import json
@@ -16,6 +17,7 @@ import nibabel as nib
 import nibabel.processing as nibproc
 import numpy as np
 from nibabel.affines import apply_affine
+from tqdm import tqdm
 
 
 def fsl_bvecs(dirs_world, affine):
@@ -52,60 +54,48 @@ def resample(img, grid, order):
 
 
 def main(args):
-    out = Path(args.out_dir)
-    out.mkdir(parents=True, exist_ok=True)
     tardis = Path(args.tardis_dir)
-    primary = Path(args.primary_dir)
-    fov = json.loads((tardis / "fov.json").read_text())
+    ms, logs, pre = tardis / "MODEL_SPACE", tardis / "LOGS", tardis / "PREPROCESSED"
+    pre.mkdir(parents=True, exist_ok=True)
+    fov = json.loads((logs / "fov.json").read_text())
 
     native = nib.load(args.dwi)
-    model_t1 = nib.load(tardis / "model_space" / "T1w.nii.gz")
+    model_t1 = nib.load(ms / "T1w.nii.gz")
     shape, aff, info = padded_native_grid(native, model_t1, fov)
     grid = (shape, aff)
     print(f"native grid {native.shape[:3]} -> padded {shape} along axis {info['slice_axis']} "
           f"(+{info['pad_before']} before, +{info['pad_after']} after)", flush=True)
 
-    # scalar maps (linear) and masks (nearest)
-    for name, src, order, dt in (("fa", primary / "fa.nii.gz", 1, np.float32),
-                                 ("md", primary / "md.nii.gz", 1, np.float32),
-                                 ("brain_mask", tardis / "model_space" / "brain_mask.nii.gz", 0, np.uint8),
-                                 ("regenerated_slices", tardis / "model_space" / "regenerated_slices.nii.gz", 0, np.uint8)):
-        arr = resample(nib.load(src), grid, order)
-        nib.save(nib.Nifti1Image(arr.astype(dt), aff), out / f"{name}_extended.nii.gz")
+    # masks (nearest neighbour)
+    for name, src in (("mask_extended", ms / "brain_mask.nii.gz"), ("regenerated_slices", ms / "regenerated_slices.nii.gz")):
+        arr = resample(nib.load(src), grid, 0)
+        nib.save(nib.Nifti1Image((arr > 0.5).astype(np.uint8), aff), pre / f"{name}.nii.gz")
 
-    # mean ADC over the model directions
-    adc_file = primary / ("adc30_extended.nii.gz" if primary.name.startswith("fod") else "adc6_extended.nii.gz")
-    adc_img = nib.load(adc_file)
-    adc_mean = nib.Nifti1Image(np.asarray(adc_img.dataobj, dtype=np.float32).mean(axis=-1), adc_img.affine)
-    nib.save(nib.Nifti1Image(resample(adc_mean, grid, 1), aff), out / "adc_mean_extended.nii.gz")
-
-    # extended synthetic DWI with its gradient table expressed for the native axes
-    dwi_img = nib.load(primary / "dwi_extended.nii.gz")
+    # synthetic DWI (linear), volume by volume, with its gradient table expressed for the native axes
+    dwi_img = nib.load(ms / "dwmri_extended.nii.gz")
     vols = [resample(nib.Nifti1Image(np.asarray(dwi_img.dataobj[..., t], dtype=np.float32), dwi_img.affine), grid, 1)
-            for t in range(dwi_img.shape[3])]
-    nib.save(nib.Nifti1Image(np.stack(vols, axis=-1), aff), out / "dwi_extended.nii.gz")
-    grad = np.loadtxt(primary / "grad.txt", comments="#")
+            for t in tqdm(range(dwi_img.shape[3]), desc="resample DWI", unit="vol")]
+    nib.save(nib.Nifti1Image(np.stack(vols, axis=-1), aff), pre / "dwmri_extended.nii.gz")
+    grad = np.loadtxt(ms / "dwmri_extended_grad.txt", comments="#")
     dirs_world, bvals = grad[:, :3], grad[:, 3]
-    np.savetxt(out / "dwi_extended.bval", bvals[None], fmt="%.1f")
-    np.savetxt(out / "dwi_extended.bvec", fsl_bvecs(dirs_world, aff).T, fmt="%.8f")
-    np.savetxt(out / "grad.txt", grad, fmt="%.8f", header="MRtrix gradient table: world (scanner RAS) x y z b")
+    np.savetxt(pre / "dwmri_extended.bval", bvals[None], fmt="%.1f")
+    np.savetxt(pre / "dwmri_extended.bvec", fsl_bvecs(dirs_world, aff).T, fmt="%.8f")
+    np.savetxt(pre / "dwmri_extended_grad.txt", grad, fmt="%.8f", header="MRtrix gradient table: world (scanner RAS) x y z b")
 
     # which padded-native slices are regenerated
-    regen = np.asarray(nib.load(out / "regenerated_slices_extended.nii.gz").dataobj) > 0
+    regen = np.asarray(nib.load(pre / "regenerated_slices.nii.gz").dataobj) > 0
     other = tuple(i for i in range(3) if i != info["slice_axis"])
     info["regenerated_slice_indices"] = [int(i) for i in np.where(regen.sum(axis=other) > 0)[0]]
-    info["primary_output"] = primary.name
+    info["n_volumes"] = int(dwi_img.shape[3])
     info["source_fov"] = fov
-    (out / "fov_native.json").write_text(json.dumps(info, indent=2))
-    print(f"native outputs -> {out}", flush=True)
+    (logs / "fov_native.json").write_text(json.dumps(info, indent=2))
+    print(f"native outputs -> {pre}", flush=True)
 
 
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--dwi", required=True, help="native preprocessed DWI defining the grid to pad")
+    p.add_argument("--dwi", required=True, help="native preprocessed DWI (defines the grid)")
     p.add_argument("--tardis-dir", required=True)
-    p.add_argument("--primary-dir", required=True, help="the <kind>_b<label> output folder to resample")
-    p.add_argument("--out-dir", required=True)
     return p.parse_args()
 
 

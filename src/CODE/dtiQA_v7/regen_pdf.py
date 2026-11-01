@@ -9,9 +9,10 @@
 # FA ROI alignment and MD. The title, phase encoding, normalization, motion and gradient check pages are
 # not rebuilt. The existing PDF/dtiQA.pdf is left alone.
 #
-# If TARDIS ran but its composite volumes are missing (outputs of PreQual versions before the composites
-# existed), they are built first with 006_composite_outputs.py into TARDIS/native, exactly as tardis.sh
-# does now. The TARDIS QA PNGs in TARDIS/QA are rewritten by the TARDIS pages.
+# If TARDIS ran (TARDIS/PREPROCESSED, TENSOR, SCALARS and LOGS present) but its COMPOSITE folder is missing,
+# the composites are built first with 006_composite_outputs.py, exactly as tardis.sh does. The TARDIS QA PNGs
+# in TARDIS/LOGS/QA are rewritten by the TARDIS pages. Outputs of PreQual versions with the older per-shell
+# TARDIS layout (fod_b<label>/, native/) are not supported; rerun TARDIS for those.
 #
 # Run inside the container with the dtiQA venv and under xvfb (mrview renders the glyph page), e.g.
 #
@@ -90,7 +91,12 @@ def main():
         eddy_mask_file = mask_file
 
     tardis_dir = os.path.join(out_dir, 'TARDIS')
-    use_tardis = os.path.exists(os.path.join(tardis_dir, 'fov.json')) and os.path.exists(os.path.join(tardis_dir, 'native', 'fov_native.json'))
+    tardis_files = [os.path.join(tardis_dir, 'LOGS', 'fov.json'), os.path.join(tardis_dir, 'LOGS', 'fov_native.json'),
+                    os.path.join(tardis_dir, 'PREPROCESSED', 'dwmri_extended.nii.gz'), os.path.join(tardis_dir, 'TENSOR', 'dwmri_extended_tensor.nii.gz'),
+                    os.path.join(tardis_dir, 'SCALARS', 'dwmri_extended_tensor_fa.nii.gz'), os.path.join(tardis_dir, 'MODEL_SPACE', 'fa.nii.gz')]
+    use_tardis = all([os.path.exists(f) for f in tardis_files])
+    if os.path.isdir(tardis_dir) and not use_tardis:
+        print('NOTE: TARDIS FOLDER FOUND BUT INCOMPLETE OR IN THE OLD PER-SHELL LAYOUT (MISSING {}), PAGES WILL USE THE NATIVE DATA'.format(', '.join([f for f in tardis_files if not os.path.exists(f)])))
 
     vis_dir = utils.make_dir(out_dir, 'PDF_CHECK')
     temp_dir = utils.make_dir(vis_dir, 'TEMP_REGEN') # vis functions use their own TEMP folder inside vis_dir
@@ -157,8 +163,8 @@ def main():
 
     fov = None
     if use_tardis:
-        native_dir = os.path.join(tardis_dir, 'native')
-        if not os.path.exists(os.path.join(native_dir, 'composite.json')):
+        composite_dir = os.path.join(tardis_dir, 'COMPOSITE')
+        if not os.path.exists(os.path.join(composite_dir, 'composite.json')):
             print('TARDIS COMPOSITE VOLUMES NOT FOUND, BUILDING THEM')
             composite_script = args.composite_script
             if composite_script == '':
@@ -167,11 +173,11 @@ def main():
             tardis_py = args.tardis_py if args.tardis_py != '' else os.path.join(tardis_home, 'venv', 'bin', 'python')
             need(composite_script)
             need(tardis_py)
-            composite_cmd = '{} {} --dwi {} --bval {} --mask {} --tensor {} --fa {} --md {} --tardis-dir {} --native-dir {}'.format(
-                tardis_py, composite_script, dwi_preproc_file, bvals_preproc_file, mask_file, tensor_file, fa_file, md_file, tardis_dir, native_dir)
+            composite_cmd = '{} {} --mask {} --tensor {} --fa {} --md {} --tardis-dir {}'.format(
+                tardis_py, composite_script, mask_file, tensor_file, fa_file, md_file, tardis_dir)
             utils.run_cmd(composite_cmd)
             v1_cmd = 'tensor2metric {} -vector {} -num 1 -modulate none -mask {} -nthreads {} -force -quiet'.format(
-                os.path.join(native_dir, 'tensor_composite.nii.gz'), os.path.join(native_dir, 'v1_composite.nii.gz'), os.path.join(native_dir, 'mask_composite.nii.gz'), SHARED_VARS.NUM_THREADS)
+                os.path.join(composite_dir, 'tensor.nii.gz'), os.path.join(composite_dir, 'v1.nii.gz'), os.path.join(composite_dir, 'mask.nii.gz'), SHARED_VARS.NUM_THREADS - 1)
             utils.run_cmd(v1_cmd)
         fov = utils.load_tardis_composites(tardis_dir)
         if fov is None:
@@ -183,7 +189,7 @@ def main():
     vis_files.append(vis.vis_preproc(dwi_raw_files, bvals_raw_files, dwi_preproc_file, bvals_preproc_file, eddy_mask_file, mask_file, percent_improbable, chisq_mask_file, vis_dir, fov=fov))
     if use_tardis:
         vis_files.extend(vis.vis_tardis(tardis_dir, vis_dir))
-    vis_files.extend(vis.vis_dwi(dwi_preproc_file, bvals_preproc_shelled, bvecs_preproc_file, cnr_dict, vis_dir, fov=fov))
+    vis_files.extend(vis.vis_dwi(dwi_preproc_file, bvals_preproc_shelled, bvecs_preproc_file, cnr_dict, vis_dir))
     vis_files.append(vis.vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_type=args.glyph_type, fov=fov))
     vis_files.append(vis.vis_scalar(fa_file, vis_dir, name='FA', comment='White matter should be bright', fov=fov))
     vis_files.append(vis.vis_fa_stats(roi_names, roi_med_fa, fa_file, atlas2subj_file, vis_dir, fov=fov))

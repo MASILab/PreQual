@@ -5,7 +5,7 @@ FOD model if any shell has >= --min-dirs-fod directions (every such shell is pro
 tensor model on the shell with the most directions among those with b <= --tensor-bmax, else on any
 shell with >= --min-dirs-tensor directions (warning); else exit 3.
 Inputs : --dwi dwmri.nii.gz --bval --bvec
-Writes : OUT/plan.json, OUT/b0_mean.nii.gz, OUT/work/model.txt
+Writes : OUT/LOGS/plan.json, OUT/LOGS/b0_mean.nii.gz, OUT/work/model.txt
 Invoke : python 001_plan_shells.py --dwi D --bval B --bvec V --out-dir OUT [--min-dirs-fod 28]
          [--min-dirs-tensor 6] [--tensor-bmax 1500] [--force-model fod|tensor]
 """
@@ -77,7 +77,9 @@ def choose(shells, args):
 
 def main(args):
     out = Path(args.out_dir)
+    logs = out / "LOGS"
     (out / "work").mkdir(parents=True, exist_ok=True)
+    logs.mkdir(parents=True, exist_ok=True)
     img = nib.load(args.dwi)
     if img.ndim != 4:
         sys.exit(f"{args.dwi}: expected a 4-D DWI, got shape {img.shape}")
@@ -94,7 +96,7 @@ def main(args):
     plan = dict(model=model, n_volumes=int(img.shape[3]), b0_threshold=B0_THRESHOLD, b0_indices=b0_idx,
                 shells=shells, selected=[s["label"] for s in selected], warnings=warnings,
                 min_dirs_fod=args.min_dirs_fod, min_dirs_tensor=args.min_dirs_tensor, tensor_bmax=args.tensor_bmax)
-    (out / "plan.json").write_text(json.dumps(plan, indent=2))
+    (logs / "plan.json").write_text(json.dumps(plan, indent=2))
     if model is None:
         sys.exit(3)
     (out / "work" / "model.txt").write_text(model)
@@ -106,8 +108,8 @@ def main(args):
     b0 = (b0 / len(b0_idx)).astype(np.float32)
     hdr = img.header.copy()
     hdr.set_data_dtype(np.float32)
-    nib.save(nib.Nifti1Image(b0, img.affine, hdr), out / "b0_mean.nii.gz")
-    print(f"mean b0 -> {out / 'b0_mean.nii.gz'}", flush=True)
+    nib.save(nib.Nifti1Image(b0, img.affine, hdr), logs / "b0_mean.nii.gz")
+    print(f"mean b0 -> {logs / 'b0_mean.nii.gz'}", flush=True)
 
 
 def parse_args():

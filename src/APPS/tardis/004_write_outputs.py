@@ -1,12 +1,15 @@
 #!/usr/bin/env python
 """
-004: write the extended volumes as NIfTI on the model grid. FOD model, per shell: synthetic DWI
-S = S0 exp(-b ADC) (one constant b0 + 30 mrtrix directions, FSL bval/bvec + MRtrix grad.txt), ADC (mm^2/s).
-Tensor model: tensor (MRtrix order xx yy zz xy xz yz, mm^2/s), ADC6, synthetic DWI on the shell's own directions.
-Plus the regenerated-slice mask, a QA figure per output and OUT/summary.txt.
-Inputs : OUT/work/{extended.npz,meta.json,inference.json}, OUT/fov.json, OUT/plan.json, OUT/model_space/*.nii.gz
-Writes : OUT/fod_b<label>/..., OUT/tensor_b<label>/..., OUT/model_space/regenerated_slices.nii.gz, OUT/QA/*.png,
-         OUT/work/outputs.txt (kind label dir, one per line, read by pipeline.sh), OUT/summary.txt
+004: write the extended volumes as NIfTI on the model grid, as one multi-shell synthetic DWI.
+FOD model: per processed shell the 30-direction ADC (mm^2/s) is saved, and S = S0 exp(-b ADC) on the 30
+mrtrix directions goes into the DWI. Tensor model: the tensor (MRtrix order xx yy zz xy xz yz, mm^2/s) and
+the 6-direction ADC are saved, and the DWI holds the shell's own directions. The DWI is one constant b0
+followed by every processed shell, with FSL bval/bvec and an MRtrix gradient table. Shells TARDIS did not
+process are not in it. Plus the regenerated-slice mask, a QA figure per shell and LOGS/summary.txt.
+Inputs : OUT/work/{extended.npz,meta.json,inference.json}, OUT/LOGS/{fov,plan}.json, OUT/MODEL_SPACE/T1w.nii.gz
+Writes : OUT/MODEL_SPACE/dwmri_extended.{nii.gz,bval,bvec}, dwmri_extended_grad.txt, regenerated_slices.nii.gz,
+         adc_b<label>.nii.gz (FOD model) or adc6_b<label>.nii.gz + tensor_b<label>.nii.gz (tensor model),
+         OUT/LOGS/QA/adc_b<label>.png, OUT/LOGS/summary.txt
 Invoke : python 004_write_outputs.py --out-dir OUT [--s0 1000]
 """
 import argparse
@@ -32,6 +35,7 @@ def fsl_bvecs(dirs_world, affine):
 
 
 def write_gradients(prefix, dirs_world, bvals, affine):
+    """<prefix>.bval, <prefix>.bvec (FSL) and <prefix>_grad.txt (MRtrix, world frame)."""
     dirs_world = np.asarray(dirs_world, float)
     bvals = np.asarray(bvals, float)
     np.savetxt(f"{prefix}.bval", bvals[None], fmt="%.1f")
@@ -78,11 +82,12 @@ def qa_figure(t1, scalar, brain, fov, title, out_png, vox):
 
 def main(args):
     out = Path(args.out_dir)
-    work, ms, qa = out / "work", out / "model_space", out / "QA"
-    qa.mkdir(exist_ok=True)
+    work, ms, logs = out / "work", out / "MODEL_SPACE", out / "LOGS"
+    qa = logs / "QA"
+    qa.mkdir(parents=True, exist_ok=True)
     meta = json.loads((work / "meta.json").read_text())
-    fov = json.loads((out / "fov.json").read_text())
-    plan = json.loads((out / "plan.json").read_text())
+    fov = json.loads((logs / "fov.json").read_text())
+    plan = json.loads((logs / "plan.json").read_text())
     inf = json.loads((work / "inference.json").read_text())
     aff = np.array(meta["affine"])
     vox = meta["vox"]
@@ -98,58 +103,65 @@ def main(args):
     out_mask[:, :, :fov["z_lo_brain"]] = False
     out_mask[:, :, fov["z_hi_brain"] + 1:] = False
 
-    lines, outputs = [], []
+    # one synthetic DWI for all processed shells: a constant b0, then each shell's directions
+    vols = [(args.s0 * out_mask).astype(np.float32)[..., None]]
+    dirs_all = [[0.0, 0.0, 0.0]]
+    bvals_all = [0.0]
+    lines = []
     for s in tqdm(meta["shells"], desc="write", unit="shell"):
         label = s["label"]
         arr = np.moveaxis(ext[f"adc_{label}"], 0, 2)                              # (X, Y, Z, C)
-        d = out / f"{kind}_b{label}"
-        d.mkdir(exist_ok=True)
         if kind == "fod":
             adc = (arr + 1.0) / 2.0 * clip_max / adc_scale * out_mask[..., None]    # mm^2/s
+            save(ms / f"adc_b{label}.nii.gz", adc, aff)
             dirs = np.asarray(meta["dirs30"])
             b = s["b_mean"]
-            sig = args.s0 * np.exp(-b * adc) * out_mask[..., None]
-            dwi = np.concatenate([(args.s0 * out_mask)[..., None], sig], axis=-1)
-            save(d / "dwi_extended.nii.gz", dwi, aff)
-            write_gradients(str(d / "dwi_extended"), np.vstack([[0, 0, 0], dirs]), [0.0] + [b] * len(dirs), aff)
-            save(d / "adc30_extended.nii.gz", adc, aff)
+            vols.append(args.s0 * np.exp(-b * adc) * out_mask[..., None])
+            dirs_all.extend(dirs.tolist())
+            bvals_all.extend([b] * len(dirs))
             scalar = adc.mean(axis=-1)
-            desc = f"FOD model, shell b={label} ({s['n_dirs']} dirs, mean b {b:.1f}): 30-direction ADC + synthetic DWI (S0={args.s0:g})"
+            desc = f"b={label} ({s['n_dirs']} acquired directions, mean b {b:.1f}): 30-direction ADC, {len(dirs)} synthetic volumes"
         else:
             adc6 = arr * out_mask[..., None]                                       # x adc_scale
             tensor = tensor_from_adc6(adc6, meta["dirs6"], adc_scale) * out_mask[..., None]
-            save(d / "tensor_extended.nii.gz", tensor, aff)
-            save(d / "adc6_extended.nii.gz", adc6 / adc_scale, aff)
+            save(ms / f"tensor_b{label}.nii.gz", tensor, aff)
+            save(ms / f"adc6_b{label}.nii.gz", adc6 / adc_scale, aff)
             g = np.asarray(s["dirs_world"])
             bv = np.asarray(s["bvals"])
             u = np.column_stack([g[:, 0] ** 2, g[:, 1] ** 2, g[:, 2] ** 2,
                                  2 * g[:, 0] * g[:, 1], 2 * g[:, 0] * g[:, 2], 2 * g[:, 1] * g[:, 2]])
             adc_g = np.einsum("...c,dc->...d", tensor, u)
-            sig = args.s0 * np.exp(-bv * adc_g) * out_mask[..., None]
-            dwi = np.concatenate([(args.s0 * out_mask)[..., None], sig], axis=-1)
-            save(d / "dwi_extended.nii.gz", dwi, aff)
-            write_gradients(str(d / "dwi_extended"), np.vstack([[0, 0, 0], g]), np.concatenate([[0.0], bv]), aff)
+            vols.append(args.s0 * np.exp(-bv * adc_g) * out_mask[..., None])
+            dirs_all.extend(g.tolist())
+            bvals_all.extend(bv.tolist())
             scalar = adc6.mean(axis=-1) / adc_scale
-            desc = f"tensor model, shell b={label} ({s['n_dirs']} dirs, mean b {s['b_mean']:.1f}): tensor + synthetic DWI (S0={args.s0:g})"
-        (d / "dwi_extended_grad.txt").rename(d / "grad.txt")
-        qa_figure(t1, scalar, out_mask, fov, f"{d.name}: {desc}", qa / f"{d.name}.png", vox)
-        outputs.append(f"{kind} {label} {d}")
-        lines.append(f"  {d.name}/  {desc}")
-    (work / "outputs.txt").write_text("\n".join(outputs) + "\n")
+            desc = f"b={label} ({s['n_dirs']} acquired directions, mean b {s['b_mean']:.1f}): tensor, {len(bv)} synthetic volumes on the acquired directions"
+        qa_figure(t1, scalar, out_mask, fov, f"{kind} model, {desc}", qa / f"adc_b{label}.png", vox)
+        lines.append(f"  {desc}")
+
+    dwi = np.concatenate(vols, axis=-1).astype(np.float32)
+    save(ms / "dwmri_extended.nii.gz", dwi, aff)
+    write_gradients(str(ms / "dwmri_extended"), dirs_all, bvals_all, aff)
+    print(f"MODEL_SPACE/dwmri_extended.nii.gz: {dwi.shape[3]} volumes (1 b0 + {dwi.shape[3] - 1} synthetic), S0 = {args.s0:g}", flush=True)
 
     summary = [
         f"TARDIS FOV extension - {kind} model ({inf['ode_steps']} ODE steps, {inf['device']}, seed {inf['seed']})",
-        f"shells: " + ", ".join(f"b{s['label']} x{s['n_dirs']}" for s in plan["shells"]) + f" | selected {plan['selected']}",
+        f"shells: " + ", ".join(f"b{s['label']} x{s['n_dirs']}" for s in plan["shells"]) + f" | processed {plan['selected']}",
         f"model grid {meta['shape']} @ {vox} mm (RAS); T1 brain z {fov['z_lo_brain']}..{fov['z_hi_brain']}, "
         f"acquired DWI z {fov['z_lo_known']}..{fov['z_hi_known']}",
         f"regenerated: {fov['n_extend_inferior']} inferior slices ({fov['mm_extend_inferior']:.0f} mm), "
         f"{fov['n_extend_superior']} superior slices ({fov['mm_extend_superior']:.0f} mm)",
-        "outputs:"] + lines + [
-        "  model_space/     T1w, brain_mask, dwi_coverage, b0_mean, regenerated_slices (model grid)",
-        "  reg/             epi_reg transforms, T1w + mask in (padded) b0 space",
-        "  fov.json, fov_slices.csv, plan.json, QA/*.png"]
+        "processed shells:"] + lines + [
+        "outputs:",
+        f"  PREPROCESSED/    dwmri_extended.nii.gz/.bval/.bvec: synthetic DWI on the native grid padded along the slice axis "
+        f"(1 constant b0 of S0={args.s0:g} + the processed shells, {'30 mrtrix directions per shell' if kind == 'fod' else 'the acquired directions'}), "
+        "mask_extended, regenerated_slices",
+        "  TENSOR/, SCALARS/  tensor and FA/MD/AD/RD/V1 fit on dwmri_extended the way PreQual fits PREPROCESSED/dwmri",
+        "  COMPOSITE/       PreQual maps where acquired, TARDIS maps where regenerated (what the PDF shows)",
+        "  MODEL_SPACE/     the same synthetic DWI, ADC per shell, T1w, brain_mask, dwi_coverage, b0_mean, regenerated_slices on the 2x2x1 mm model grid",
+        "  LOGS/            plan, fov, fov_slices.csv, fov_native, meta, inference, this summary, registration (reg/), T1 preprocessing, QA/*.png"]
     summary += [f"WARNING: {w}" for w in plan.get("warnings", [])]
-    (out / "summary.txt").write_text("\n".join(summary) + "\n")
+    (logs / "summary.txt").write_text("\n".join(summary) + "\n")
     print("\n".join(summary), flush=True)
 
 

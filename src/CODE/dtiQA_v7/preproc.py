@@ -384,8 +384,9 @@ def tardis(dwi_file, bvals_file, bvecs_file, t1_file, tardis_dir, num_threads, m
 
     # TARDIS FOV extension (see /APPS/tardis/tardis.sh). This is an add-on stage: it never fails the
     # pipeline. Returns (success, warning_str). Exit code 3 means no shell had enough directions.
-    # The native mask/tensor/FA/MD let TARDIS write composite volumes (native where acquired, TARDIS where
-    # regenerated) that the PDF uses for every brain figure.
+    # Writes <tardis_dir>/{PREPROCESSED,TENSOR,SCALARS,COMPOSITE,MODEL_SPACE,LOGS}. The native mask/tensor/FA/MD
+    # let TARDIS write the COMPOSITE volumes (native where acquired, TARDIS where regenerated) that the PDF
+    # uses for every brain figure.
 
     print('RUNNING TARDIS FOV EXTENSION WITH {} ...'.format(t1_file))
 

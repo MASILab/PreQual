@@ -168,7 +168,7 @@ From: /nfs2/harmonization/singularities/neuro_base_with_ants.tar
     for f in checkpoints/flow_difov_2d_basegd_multiB_best.pt checkpoints/flow_difov_2d_multicond_t1_best.pt; do
         [ -s "$f" ] || { echo "missing TARDIS checkpoint /APPS/tardis/$f" >&2; exit 1; }
     done
-    for s in 001_plan_shells.py 002_build_volumes.py 003_extend_fov.py 004_write_outputs.py 005_native_outputs.py; do
+    for s in 001_plan_shells.py 002_build_volumes.py 003_extend_fov.py 004_write_outputs.py 005_native_outputs.py 006_composite_outputs.py; do
         venv/bin/python "/APPS/tardis/$s" --help > /dev/null
     done
     chmod +x /APPS/tardis/*.sh /APPS/tardis/*.py

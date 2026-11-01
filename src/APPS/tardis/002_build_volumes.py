@@ -6,8 +6,8 @@ tournier07 lmax-6 SH fit of each selected shell projected onto the 30 mrtrix dir
 [-1,1]; tensor model: dipy WLS tensor on the selected shell -> ADC along 6 icosahedral directions, x1000) and
 locate the acquired DWI footprint inside the T1 brain (the slices to regenerate).
 Inputs : --plan plan.json --dwi --bval --bvec --t1 reg/T1w_in_dwi.nii.gz --mask reg/T1w_mask_in_dwi.nii.gz --dirs 30_dir_mrtrix_dirgen.txt
-Writes : OUT/work/model_input.npz, OUT/work/meta.json, OUT/fov.json, OUT/fov_slices.csv,
-         OUT/model_space/{T1w,brain_mask,dwi_coverage,b0_mean}.nii.gz
+Writes : OUT/work/model_input.npz, OUT/work/meta.json, OUT/LOGS/fov.json, OUT/LOGS/fov_slices.csv,
+         OUT/MODEL_SPACE/{T1w,brain_mask,dwi_coverage,b0_mean}.nii.gz
 Invoke : python 002_build_volumes.py --plan P --dwi D --bval B --bvec V --t1 T --mask M --dirs F --out-dir OUT
          [--coverage-frac 0.9] [--min-brain-voxels 1] [--erase-edge 0] [--z-margin 2] [--threads N]
 """
@@ -191,9 +191,9 @@ def tensor_adc6(data, idx, b0_idx, dirs, bvals, fit_mask):
 
 def main(args):
     out = Path(args.out_dir)
-    work, ms = out / "work", out / "model_space"
-    work.mkdir(parents=True, exist_ok=True)
-    ms.mkdir(parents=True, exist_ok=True)
+    work, ms, logs = out / "work", out / "MODEL_SPACE", out / "LOGS"
+    for d in (work, ms, logs):
+        d.mkdir(parents=True, exist_ok=True)
     plan = json.loads(Path(args.plan).read_text())
     model = plan["model"]
     shells = [s for s in plan["shells"] if s["label"] in plan["selected"]]
@@ -252,8 +252,8 @@ def main(args):
     np.savez(work / "model_input.npz", t1=t1n, brain=np.moveaxis(brain, 2, 0), covered=np.moveaxis(covered, 2, 0),
              **arrays)
     (work / "meta.json").write_text(json.dumps(meta, indent=2))
-    (out / "fov.json").write_text(json.dumps(fov, indent=2))
-    with (out / "fov_slices.csv").open("w", newline="") as f:
+    (logs / "fov.json").write_text(json.dumps(fov, indent=2))
+    with (logs / "fov_slices.csv").open("w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["z", "brain_voxels", "covered_voxels", "covered_frac_all_volumes", "covered_frac_b0", "known_fov", "regenerated"])
         w.writerows(rows)

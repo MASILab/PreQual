@@ -960,7 +960,9 @@ def vis_gradcheck(bvals_files, bvecs_files, bvals_preproc_file, bvecs_preproc_fi
 
     return gradcheck_vis_file
 
-def vis_dwi(dwi_file, bvals_shelled, bvecs_file, cnr_dict, vis_dir, fov=None):
+def vis_dwi(dwi_file, bvals_shelled, bvecs_file, cnr_dict, vis_dir):
+
+    # Per-shell averages of the preprocessed data as acquired (the TARDIS extension is not shown here)
 
     print('VISUALIZING DWI')
 
@@ -970,7 +972,6 @@ def vis_dwi(dwi_file, bvals_shelled, bvecs_file, cnr_dict, vis_dir, fov=None):
     
     bvals = np.sort(np.unique(bvals_shelled))
     offsets = [-10, -5, 0, 5, 10]
-    fov_markers = utils.fov_marker_slices(fov, offsets=offsets) if fov is not None else None
 
     for i in range(len(bvals)):
 
@@ -980,25 +981,12 @@ def vis_dwi(dwi_file, bvals_shelled, bvecs_file, cnr_dict, vis_dir, fov=None):
         bXs_file, num_bXs, _ = utils.dwi_extract(dwi_file, bvals_shelled_file, temp_dir, target_bval=bX, first_only=False)
         bXs_avg_file = utils.dwi_avg(bXs_file, temp_dir)
 
-        comment = ''
-        if fov is not None:
-            # TARDIS-processed shell: composite mean image (native where acquired, scaled synthetic where regenerated).
-            # b0 and other shells: native data on the padded grid (black beyond the blue line).
-            shell_file = utils.fov_shell_file(fov, bX)
-            if shell_file is not None:
-                bXs_avg_file = shell_file
-                comment = 'TARDIS-extended beyond the blue line'
-            else:
-                bXs_avg_file = utils.pad_to_fov(bXs_avg_file, fov, temp_dir)
-                comment = 'not extended by TARDIS; blue line: FOV extension starts'
-            bXs_avg_slices, bXs_avg_vox_dim, bXs_avg_min, bXs_avg_max = utils.slice_nii(bXs_avg_file, offsets=offsets, min_intensity=0, max_percentile=SHARED_VARS.VIS_PERCENTILE_MAX, center_vol_file=fov['acquired'])
-        else:
-            bXs_avg_slices, bXs_avg_vox_dim, bXs_avg_min, bXs_avg_max = utils.slice_nii(bXs_avg_file, offsets=offsets, min_intensity=0, max_percentile=SHARED_VARS.VIS_PERCENTILE_MAX)
+        bXs_avg_slices, bXs_avg_vox_dim, bXs_avg_min, bXs_avg_max = utils.slice_nii(bXs_avg_file, offsets=offsets, min_intensity=0, max_percentile=SHARED_VARS.VIS_PERCENTILE_MAX)
         
         cnr = '{:.3f}'.format(cnr_dict[bX])
         cnr_label = 'SNR' if bX == 0 else 'CNR'
 
-        bXs_vis_file = _vis_vol(bXs_avg_slices, bXs_avg_vox_dim, bXs_avg_min, bXs_avg_max, vis_dir, name='Preprocessed_b_=_{},_{}_scan_average,_{}_=_{}'.format(bX, num_bXs, cnr_label, cnr), comment=comment, colorbar=False, fov_markers=fov_markers)
+        bXs_vis_file = _vis_vol(bXs_avg_slices, bXs_avg_vox_dim, bXs_avg_min, bXs_avg_max, vis_dir, name='Preprocessed_b_=_{},_{}_scan_average,_{}_=_{}'.format(bX, num_bXs, cnr_label, cnr), colorbar=False)
         dwi_vis_files.append(bXs_vis_file)
 
         bvals_shelled_file.close()
@@ -1430,30 +1418,31 @@ def vis_tardis(tardis_dir, vis_dir):
     # model grid with the acquired FOV and the T1 brain extent marked, and a run summary. Then one page per
     # extended end (superior / inferior) with up to SHARED_VARS.TARDIS_QA_SLICES_PER_END regenerated axial
     # FA slices, each beside the corresponding T1 slice. Pages are saved as PDF (for dtiQA.pdf) and as PNG
-    # copies in <tardis_dir>/QA.
+    # copies in <tardis_dir>/LOGS/QA. Reads <tardis_dir>/LOGS/{fov,inference,meta,plan}.json and
+    # <tardis_dir>/MODEL_SPACE/{T1w,brain_mask,fa}.nii.gz (FA of the synthetic multi-shell DWI on the model grid).
 
     import json
     import matplotlib.gridspec as gridspec
 
     print('VISUALIZING TARDIS FOV EXTENSION')
 
-    with open(os.path.join(tardis_dir, 'fov.json')) as f:
+    logs_dir = os.path.join(tardis_dir, 'LOGS')
+    model_dir = os.path.join(tardis_dir, 'MODEL_SPACE')
+    with open(os.path.join(logs_dir, 'fov.json')) as f:
         fov = json.load(f)
-    with open(os.path.join(tardis_dir, 'primary_output.txt')) as f:
-        kind, label, primary_dir = f.read().split()
-    primary_dir = os.path.join(tardis_dir, os.path.basename(primary_dir.rstrip('/'))) # stored as an absolute path of the original run (e.g. /OUTPUTS/TARDIS/...), resolve it against the TARDIS folder we were given
-    with open(os.path.join(tardis_dir, 'inference.json')) as f:
+    with open(os.path.join(logs_dir, 'inference.json')) as f:
         inf = json.load(f)
-    with open(os.path.join(tardis_dir, 'meta.json')) as f:
+    with open(os.path.join(logs_dir, 'meta.json')) as f:
         meta = json.load(f)
-    with open(os.path.join(tardis_dir, 'plan.json')) as f:
+    with open(os.path.join(logs_dir, 'plan.json')) as f:
         plan = json.load(f)
     vox = meta['vox']
-    shell = [s for s in meta['shells'] if str(s['label']) == label][0]
+    kind = meta['model']
+    shells_str = ', '.join('b={} ({} directions)'.format(s['label'], s['n_dirs']) for s in meta['shells'])
 
-    t1 = np.nan_to_num(nib.load(os.path.join(tardis_dir, 'model_space', 'T1w.nii.gz')).get_fdata())
-    brain = nib.load(os.path.join(tardis_dir, 'model_space', 'brain_mask.nii.gz')).get_fdata() > 0.5
-    fa = np.clip(np.nan_to_num(nib.load(os.path.join(primary_dir, 'fa.nii.gz')).get_fdata()), 0, 1)
+    t1 = np.nan_to_num(nib.load(os.path.join(model_dir, 'T1w.nii.gz')).get_fdata())
+    brain = nib.load(os.path.join(model_dir, 'brain_mask.nii.gz')).get_fdata() > 0.5
+    fa = np.clip(np.nan_to_num(nib.load(os.path.join(model_dir, 'fa.nii.gz')).get_fdata()), 0, 1)
     t1_max = float(np.percentile(t1[brain], 99)) if brain.any() else float(t1.max())
     if not t1_max > 0:
         t1_max = 1.0
@@ -1485,7 +1474,7 @@ def vis_tardis(tardis_dir, vis_dir):
     cy = int(round(ijk[:, 1].mean())) if ijk.size > 0 else t1.shape[1] // 2
 
     tardis_vis_files = []
-    qa_dir = utils.make_dir(tardis_dir, 'QA')
+    qa_dir = utils.make_dir(logs_dir, 'QA')
 
     # Page 1: where the FOV is cut
 
@@ -1513,13 +1502,13 @@ def vis_tardis(tardis_dir, vis_dir):
     ax = fig.add_subplot(gs[1, :])
     ax.axis('off')
     summary_str = \
-    str('Model: {} ({} shell b={}, {} directions), {} ODE steps, seed {}, device: {}, {} s\n'
+    str('Model: {} on {}; {} ODE steps, seed {}, device: {}, {} s\n'
         'T1 brain spans slices {}-{}; acquired DWI covers slices {}-{} ({} slices of {:g} mm).\n'
         'Regenerated: {} inferior slices ({:.0f} mm) and {} superior slices ({:.0f} mm). Fully acquired slices are never modified.\n'
         '{}'
         'Cyan dashed: acquired DWI FOV. Orange dotted: T1 brain extent. Mid-slices are shown in radiological view.'
         '{}'
-        .format('FOD (30-direction, multi-b)' if kind == 'fod' else 'tensor (6-direction)', kind, label, shell['n_dirs'],
+        .format('FOD (30-direction, multi-b)' if kind == 'fod' else 'tensor (6-direction)', shells_str,
                 inf['ode_steps'], inf['seed'], inf['device'], inf['seconds'],
                 fov['z_lo_brain'], fov['z_hi_brain'], fov['z_lo_known'], fov['z_hi_known'], fov['n_known'], vox[2],
                 fov['n_extend_inferior'], fov['mm_extend_inferior'], fov['n_extend_superior'], fov['mm_extend_superior'],

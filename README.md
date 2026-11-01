@@ -55,7 +55,7 @@ Example `dtiQA_config.csv` for two forward scans and one reverse phase-encoded s
     outputs/
       PREPROCESSED/dwmri.nii.gz  dwmri.bval  dwmri.bvec    final preprocessed data
       PDF/dtiQA.pdf                                        quality assurance report
-      TARDIS/                                              field-of-view extension (if a T1 was supplied)
+      TARDIS/PREPROCESSED/dwmri_extended.nii.gz  .bval  .bvec  field-of-view-extended data (if a T1 was supplied)
 
 Every output folder and file, and which ones you need: [Outputs](docs/OUTPUTS.md). How to read the report: [How to QA](docs/QA_GUIDE.md).
 

@@ -1014,17 +1014,17 @@ def det_matrix(l):
 
 def load_tardis_composites(tardis_dir):
 
-    # Returns a dict describing the composite volumes TARDIS wrote (native metric where acquired, TARDIS
-    # where regenerated, on the padded native grid), or None if they are not there.
+    # Returns a dict describing the composite volumes TARDIS wrote to <tardis_dir>/COMPOSITE (native metric
+    # where acquired, TARDIS where regenerated, on the padded native grid), or None if they are not there.
 
     import json
 
-    composite_file = os.path.join(tardis_dir, 'native', 'composite.json')
+    composite_dir = os.path.join(tardis_dir, 'COMPOSITE')
+    composite_file = os.path.join(composite_dir, 'composite.json')
     if not os.path.exists(composite_file):
         return None
     with open(composite_file) as f:
         meta = json.load(f)
-    native_dir = os.path.join(tardis_dir, 'native')
     fov = {
         'slice_axis': int(meta['slice_axis']),
         'pad_before': int(meta['pad_before']),
@@ -1033,28 +1033,14 @@ def load_tardis_composites(tardis_dir):
         'acquired_range': meta['acquired_range'],
         'regenerated_slices': meta['regenerated_slices'],
         'boundary_slices': meta['boundary_slices'],
-        'shells': {},
     }
     for key, fname in meta['files'].items():
-        fov[key] = os.path.join(native_dir, fname)
-    for s in meta['shells']:
-        fov['shells'][float(s['label'])] = os.path.join(native_dir, s['file'])
+        fov[key] = os.path.join(composite_dir, fname)
     for key in ('fa', 'md', 'tensor', 'v1', 'mask', 'boundary', 'regenerated', 'acquired'):
         if not os.path.exists(fov[key]):
             print('WARNING: TARDIS COMPOSITE {} NOT FOUND, PDF WILL USE NATIVE DATA'.format(fov[key]))
             return None
     return fov
-
-def fov_shell_file(fov, bval, tol=0.1):
-
-    # The composite mean image of the TARDIS-processed shell matching this b-value, or None
-
-    if fov is None:
-        return None
-    for label, shell_file in fov['shells'].items():
-        if label > 0 and abs(label - float(bval)) <= tol * max(label, 1):
-            return shell_file
-    return None
 
 def pad_to_fov(nii_file, fov, out_dir, dtype=''):
 
