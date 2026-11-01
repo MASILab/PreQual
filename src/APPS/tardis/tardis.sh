@@ -4,6 +4,9 @@
 # Usage: tardis.sh <dwi.nii.gz> <dwi.bval> <dwi.bvec> <t1.nii.gz> <out_dir> <num_threads>
 #                  [<mask.nii.gz> <tensor.nii.gz> <fa.nii.gz> <md.nii.gz>]
 #
+# Environment: TARDIS_T1_STRIPPED=1 when <t1.nii.gz> is already skull-stripped (its non-zero extent is then the
+# brain mask and SynthStrip is skipped); TARDIS_* variables below override the model parameters.
+#
 # Regenerates the superior/inferior brain slices cut off by the diffusion acquisition with the TARDIS
 # rectified-flow models (FOD model for shells with >= 28 directions, tensor model otherwise) and writes
 # the result in the same shape as PreQual's own output:
@@ -14,7 +17,7 @@
 #   <out_dir>/SCALARS/       dwmri_extended_tensor_{fa,md,ad,rd,v1}.nii.gz
 #   <out_dir>/COMPOSITE/     PreQual maps where acquired, TARDIS maps where regenerated (what the PDF shows);
 #                            only written when the four optional native PreQual files are given
-#   <out_dir>/MODEL_SPACE/   the same on the 2x2x1 mm RAS model grid, plus the per-shell ADC the model produced
+#   <out_dir>/MODEL_SPACE/   the same on the model grid (native in-plane lattice, 1 mm slices; 2x2x1 mm RAS fallback), plus the per-shell ADC
 #   <out_dir>/LOGS/          plan, fov, meta, inference, summary, registration, T1 preprocessing, QA figures
 #
 # Exit codes: 0 ok | 3 no shell with enough directions for either model | other = failure
@@ -52,6 +55,7 @@ PAD_MM=${TARDIS_PAD_MM:-80}
 SEED=${TARDIS_SEED:-0}
 S0=${TARDIS_S0:-1000}
 DEVICE=${TARDIS_DEVICE:-auto}
+T1_STRIPPED=${TARDIS_T1_STRIPPED:-0}      # 1 = the given T1 is already skull-stripped: its extent is the brain mask
 
 export TMPDIR=${TMPDIR:-/tmp}
 export MRTRIX_TMPFILE_DIR=${MRTRIX_TMPFILE_DIR:-$TMPDIR}
@@ -59,6 +63,7 @@ export MPLCONFIGDIR=${MPLCONFIGDIR:-$TMPDIR/tardis_mpl}
 export XDG_CACHE_HOME=${XDG_CACHE_HOME:-$TMPDIR/tardis_cache}
 export FSLOUTPUTTYPE=NIFTI_GZ
 export OMP_NUM_THREADS=$THREADS OPENBLAS_NUM_THREADS=$THREADS MKL_NUM_THREADS=$THREADS
+export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$THREADS MRTRIX_NTHREADS=$THREADS   # ANTs (DenoiseImage, N4) and MRtrix
 mkdir -p "$MPLCONFIGDIR" "$XDG_CACHE_HOME" "$MRTRIX_TMPFILE_DIR" 2>/dev/null || true
 
 log() { echo "[TARDIS] $*"; }
@@ -108,11 +113,15 @@ B0=$LOGS/b0_mean.nii.gz
 if [[ "$MODEL" == "fod" ]]; then CKPT=$FOD_CKPT; else CKPT=$TENSOR_CKPT; fi
 [[ -s "$CKPT" ]] || die "checkpoint for the $MODEL model not found: $CKPT"
 
-# ── 2. T1 brain mask (SynthStrip, fallback bet) ──────────────────────────────
+# ── 2. T1 brain mask: the T1's own extent if it is already skull-stripped, else SynthStrip (fallback bet) ─
 log "=== 2/10 T1 brain mask ==="
 MASK=$LOGS/T1w_mask.nii.gz
 ss_ok=0
-if command -v mri_synthstrip >/dev/null 2>&1; then
+if [[ "$T1_STRIPPED" == "1" ]]; then
+    log "T1 is already skull-stripped (PreQual --synb0 stripped): brain mask = non-zero T1 voxels, holes filled; SynthStrip skipped"
+    fslmaths "$T1" -abs -thr 0 -bin -fillh "$MASK"
+    ss_ok=1
+elif command -v mri_synthstrip >/dev/null 2>&1; then
     if [[ $GPU -eq 1 ]]; then mri_synthstrip -i "$T1" -m "$MASK" -g && ss_ok=1 || log "synthstrip on GPU failed, retrying on CPU"; fi
     [[ $ss_ok -eq 1 ]] || { mri_synthstrip -i "$T1" -m "$MASK" && ss_ok=1 || true; }
 fi

@@ -380,17 +380,18 @@ def scalars(tensor_file, mask_file, scalars_dir):
 
     return fa_file, md_file, ad_file, rd_file, v1_file
 
-def tardis(dwi_file, bvals_file, bvecs_file, t1_file, tardis_dir, num_threads, mask_file, tensor_file, fa_file, md_file):
+def tardis(dwi_file, bvals_file, bvecs_file, t1_file, t1_stripped, tardis_dir, num_threads, mask_file, tensor_file, fa_file, md_file):
 
     # TARDIS FOV extension (see /APPS/tardis/tardis.sh). This is an add-on stage: it never fails the
     # pipeline. Returns (success, warning_str). Exit code 3 means no shell had enough directions.
     # Writes <tardis_dir>/{PREPROCESSED,TENSOR,SCALARS,COMPOSITE,MODEL_SPACE,LOGS}. The native mask/tensor/FA/MD
     # let TARDIS write the COMPOSITE volumes (native where acquired, TARDIS where regenerated) that the PDF
-    # uses for every brain figure.
+    # uses for every brain figure. If the user's T1 is already skull-stripped (--synb0 stripped), TARDIS takes
+    # its brain mask from the T1's non-zero voxels instead of running SynthStrip.
 
-    print('RUNNING TARDIS FOV EXTENSION WITH {} ...'.format(t1_file))
+    print('RUNNING TARDIS FOV EXTENSION WITH {}{} ...'.format(t1_file, ' (already skull-stripped)' if t1_stripped else ''))
 
-    tardis_cmd = 'bash {} {} {} {} {} {} {} {} {} {} {}'.format(SHARED_VARS.TARDIS_EXEC_FILE, dwi_file, bvals_file, bvecs_file, t1_file, tardis_dir, num_threads, mask_file, tensor_file, fa_file, md_file)
+    tardis_cmd = 'export TARDIS_T1_STRIPPED={} ; bash {} {} {} {} {} {} {} {} {} {} {}'.format(1 if t1_stripped else 0, SHARED_VARS.TARDIS_EXEC_FILE, dwi_file, bvals_file, bvecs_file, t1_file, tardis_dir, num_threads, mask_file, tensor_file, fa_file, md_file)
     print('RUNNING: {}'.format(tardis_cmd))
     rc = subprocess.call(tardis_cmd, shell=True)
 

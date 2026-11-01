@@ -227,6 +227,11 @@ def main():
         SHARED_VARS.NUM_THREADS = int(num_threads)
     else:
         raise utils.DTIQAError('INVALID INPUT FOR --num_threads PARAMETER. EXITING.')
+
+    # Propagate the thread count to every tool that reads it from the environment (inherited by all
+    # subprocesses): ANTs/ITK (antsRegistration, N4, DenoiseImage), OpenMP (FSL, torch), MRtrix3.
+    for thread_var in ('ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS', 'OMP_NUM_THREADS', 'MRTRIX_NTHREADS'):
+        os.environ[thread_var] = str(SHARED_VARS.NUM_THREADS)
         
     params['project'] = args.project
     params['subject'] = args.subject
@@ -827,7 +832,7 @@ def main():
 
     if use_tardis:
         tardis_dir = utils.make_dir(out_dir, 'TARDIS')
-        tardis_success, tardis_warning_str = preproc.tardis(dwi_preproc_file, bvals_preproc_file, bvecs_preproc_file, t1_sform_file, tardis_dir, SHARED_VARS.NUM_THREADS, mask_file, tensor_file, fa_file, md_file)
+        tardis_success, tardis_warning_str = preproc.tardis(dwi_preproc_file, bvals_preproc_file, bvecs_preproc_file, t1_sform_file, params['t1_stripped'], tardis_dir, SHARED_VARS.NUM_THREADS, mask_file, tensor_file, fa_file, md_file)
         if not tardis_success:
             warning_strs.append(tardis_warning_str)
             use_tardis = False

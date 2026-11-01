@@ -147,7 +147,8 @@ def main(args):
     summary = [
         f"TARDIS FOV extension - {kind} model ({inf['ode_steps']} ODE steps, {inf['device']}, seed {inf['seed']})",
         f"shells: " + ", ".join(f"b{s['label']} x{s['n_dirs']}" for s in plan["shells"]) + f" | processed {plan['selected']}",
-        f"model grid {meta['shape']} @ {vox} mm (RAS); T1 brain z {fov['z_lo_brain']}..{fov['z_hi_brain']}, "
+        f"model grid {meta['shape']} @ {vox[0]:.3f}x{vox[1]:.3f}x{vox[2]:g} mm ({meta['grid'].get('note', meta['grid'].get('grid', ''))}); "
+        f"T1 brain z {fov['z_lo_brain']}..{fov['z_hi_brain']}, "
         f"acquired DWI z {fov['z_lo_known']}..{fov['z_hi_known']}",
         f"regenerated: {fov['n_extend_inferior']} inferior slices ({fov['mm_extend_inferior']:.0f} mm), "
         f"{fov['n_extend_superior']} superior slices ({fov['mm_extend_superior']:.0f} mm)",
@@ -158,7 +159,7 @@ def main(args):
         "mask_extended, regenerated_slices",
         "  TENSOR/, SCALARS/  tensor and FA/MD/AD/RD/V1 fit on dwmri_extended the way PreQual fits PREPROCESSED/dwmri",
         "  COMPOSITE/       PreQual maps where acquired, TARDIS maps where regenerated (what the PDF shows)",
-        "  MODEL_SPACE/     the same synthetic DWI, ADC per shell, T1w, brain_mask, dwi_coverage, b0_mean, regenerated_slices on the 2x2x1 mm model grid",
+        "  MODEL_SPACE/     the same synthetic DWI, ADC per shell, T1w, brain_mask, dwi_coverage, b0_mean, regenerated_slices on the model grid",
         "  LOGS/            plan, fov, fov_slices.csv, fov_native, meta, inference, this summary, registration (reg/), T1 preprocessing, QA/*.png"]
     summary += [f"WARNING: {w}" for w in plan.get("warnings", [])]
     (logs / "summary.txt").write_text("\n".join(summary) + "\n")

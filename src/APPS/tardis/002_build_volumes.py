@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 """
-002: resample the DWI, the registered T1 and its brain mask onto the model grid (037's grid: canonical RAS,
-2x2x1 mm, 128x128 in-plane, z extended so the whole T1 brain fits), build the model input (FOD model:
+002: put the DWI, the registered T1 and its brain mask on the model grid, build the model input (FOD model:
 tournier07 lmax-6 SH fit of each selected shell projected onto the 30 mrtrix directions -> ADC, x1000, clip 3.5,
 [-1,1]; tensor model: dipy WLS tensor on the selected shell -> ADC along 6 icosahedral directions, x1000) and
 locate the acquired DWI footprint inside the T1 brain (the slices to regenerate).
+Model grid: the native in-plane lattice (closest-canonical axis order and flips only, native in-plane voxel size
+and origin, so no in-plane interpolation in either direction), 1 mm slices along the native slice axis, cropped or
+zero-padded to 128x128 in-plane, z extended so the whole T1 brain fits. If the T1 brain does not fit inside that
+128x128 window, the training grid is used instead (canonical RAS, resampled to 2x2x1 mm).
 Inputs : --plan plan.json --dwi --bval --bvec --t1 reg/T1w_in_dwi.nii.gz --mask reg/T1w_mask_in_dwi.nii.gz --dirs 30_dir_mrtrix_dirgen.txt
 Writes : OUT/work/model_input.npz, OUT/work/meta.json, OUT/LOGS/fov.json, OUT/LOGS/fov_slices.csv,
          OUT/MODEL_SPACE/{T1w,brain_mask,dwi_coverage,b0_mean}.nii.gz
@@ -28,7 +31,7 @@ from joblib import Parallel, delayed
 from nibabel.affines import apply_affine
 from tqdm import tqdm
 
-VOX = (2.0, 2.0, 1.0)          # 037 grid (x, y, z) mm, canonical RAS
+VOX = (2.0, 2.0, 1.0)          # 037 training grid (x, y, z) mm, canonical RAS: the fallback grid; slices are always 1 mm
 CROP = 128                     # 037 in-plane crop/pad
 B0_THRESHOLD = 50.0
 LMAX, SH_BASIS, SMOOTH = 6, "tournier07", 0.006      # 037 SH fit
@@ -60,12 +63,10 @@ def world_dirs(bvecs, affine):
     return np.where(n > 0, w / np.maximum(n, 1e-12), 0.0)
 
 
-def model_grid(dwi_img, mask_img, z_margin):
-    """037's resample_to_output grid (ref) and the model grid: ref cropped/padded to 128x128 in-plane (037's
-    fit_in_plane) and extended in z to cover the registered T1 mask. -> (ref_img, shape, affine, info).
-    DWI volumes are resampled onto ref exactly as in training and embedded by integer offsets (embed())."""
-    ref = nibproc.resample_to_output(nib.Nifti1Image(np.zeros(dwi_img.shape[:3], np.float32), dwi_img.affine),
-                                     voxel_sizes=VOX, order=1)
+def _grid_from_ref(ref, mask_img, z_margin):
+    """Model grid from a reference grid that already has 1 mm slices: ref cropped/padded to 128x128 in-plane
+    (037's fit_in_plane) and extended in z to cover the registered T1 mask. -> (shape, affine, info, mask_xy).
+    mask_xy are the in-plane voxel coordinates of the T1 brain mask on ref (for the fit check)."""
     X, Y, Z = ref.shape
     A = ref.affine
     ox = (X - CROP) // 2 if X > CROP else -((CROP - X) // 2)
@@ -73,7 +74,8 @@ def model_grid(dwi_img, mask_img, z_margin):
     ijk = np.argwhere(np.asarray(mask_img.dataobj) > 0.5)
     if ijk.size == 0:
         sys.exit("registered T1 mask is empty")
-    vz = apply_affine(np.linalg.inv(A), apply_affine(mask_img.affine, ijk))[:, 2]
+    v = apply_affine(np.linalg.inv(A), apply_affine(mask_img.affine, ijk))
+    vz = v[:, 2]
     z0 = min(0, int(np.floor(vz.min())) - z_margin)
     z1 = max(Z - 1, int(np.ceil(vz.max())) + z_margin)
     aff = A.copy()
@@ -81,6 +83,43 @@ def model_grid(dwi_img, mask_img, z_margin):
     shape = (CROP, CROP, z1 - z0 + 1)
     info = dict(ref_shape=[int(X), int(Y), int(Z)], inplane_offset=[int(ox), int(oy)], z_offset=int(z0),
                 dwi_z_range_in_grid=[int(-z0), int(-z0 + Z - 1)])
+    return shape, aff, info, v[:, :2]
+
+
+def model_grid(dwi_img, mask_img, z_margin):
+    """The model grid. Preferred: the native in-plane lattice, reoriented to closest-canonical by axis
+    permutation and flips only (exact), with the native in-plane voxel size and origin and 1 mm slices along
+    the native slice axis. The DWI then needs no in-plane interpolation on the way in, and the extended data
+    none on the way back to the native grid (slice centres coincide wherever the native slice spacing is an
+    integer number of mm). Fallback, when the T1 brain does not fit inside the 128x128 window at native
+    resolution: 037's training grid, canonical RAS resampled to 2x2x1 mm.
+    -> (ref_img, shape, affine, info). DWI volumes are resampled onto ref and embedded by integer offsets."""
+    can = nib.as_closest_canonical(nib.Nifti1Image(np.zeros(dwi_img.shape[:3], np.uint8), dwi_img.affine))
+    A = can.affine
+    X, Y, Z = can.shape
+    dz = round(float(np.linalg.norm(A[:3, 2])), 6)                   # rounded: a tilted affine gives 2.0000000000000004
+    ref_aff = A.copy()
+    ref_aff[:3, 2] = A[:3, 2] / dz                                   # 1 mm steps along the native slice axis
+    Zref = int(np.ceil((Z - 1) * dz)) + 1
+    ref = nib.Nifti1Image(np.zeros((X, Y, Zref), np.float32), ref_aff)
+    shape, aff, info, mask_xy = _grid_from_ref(ref, mask_img, z_margin)
+    ox, oy = info["inplane_offset"]
+    fits = (mask_xy[:, 0].min() >= ox and mask_xy[:, 0].max() <= ox + CROP - 1 and
+            mask_xy[:, 1].min() >= oy and mask_xy[:, 1].max() <= oy + CROP - 1)
+    inplane = [float(np.linalg.norm(A[:3, 0])), float(np.linalg.norm(A[:3, 1]))]
+    if fits:
+        info.update(grid="native_lattice", inplane_vox=inplane, native_slice_mm=dz,
+                    note="native in-plane lattice (no in-plane interpolation), 1 mm slices along the native slice axis")
+        print(f"model grid: native in-plane lattice {inplane[0]:.3f}x{inplane[1]:.3f} mm (native slices {dz:g} mm -> 1 mm)", flush=True)
+        return ref, shape, aff, info
+    print(f"model grid: T1 brain does not fit 128x128 at the native in-plane voxel size {inplane[0]:.3f}x{inplane[1]:.3f} mm "
+          f"(mask spans x {mask_xy[:, 0].min():.0f}..{mask_xy[:, 0].max():.0f}, y {mask_xy[:, 1].min():.0f}..{mask_xy[:, 1].max():.0f} "
+          f"vs window {ox}..{ox + CROP - 1}, {oy}..{oy + CROP - 1}); falling back to the 2x2x1 mm training grid", flush=True)
+    ref = nibproc.resample_to_output(nib.Nifti1Image(np.zeros(dwi_img.shape[:3], np.float32), dwi_img.affine),
+                                     voxel_sizes=VOX, order=1)
+    shape, aff, info, _ = _grid_from_ref(ref, mask_img, z_margin)
+    info.update(grid="resampled_2mm", inplane_vox=[VOX[0], VOX[1]], native_slice_mm=dz,
+                note="T1 brain does not fit 128x128 at native resolution: canonical RAS grid resampled to 2x2x1 mm")
     return ref, shape, aff, info
 
 
@@ -113,6 +152,26 @@ def embed(vol_ref, shape, info):
 def resample(data, affine, grid, order):
     img = nib.Nifti1Image(np.ascontiguousarray(data, dtype=np.float32), affine)
     return np.asarray(nibproc.resample_from_to(img, grid, order=order).dataobj, dtype=np.float32)
+
+
+def to_native_lattice_ref(data, affine, ref, order):
+    """Native volume -> the native-lattice ref grid without any in-plane interpolation: reorient to closest
+    canonical by axis permutation/flips (exact), then interpolate along the slice axis only (linear, or nearest
+    for masks). Equivalent to resample() but immune to the resampler dropping boundary voxels when the exact
+    integer mapping lands a hair outside the volume."""
+    can = np.asarray(nib.apply_orientation(np.asarray(data, dtype=np.float32), nib.io_orientation(affine)))
+    Z = can.shape[2]
+    dz = round(float(np.linalg.norm(nib.as_closest_canonical(nib.Nifti1Image(np.zeros(data.shape[:3], np.uint8), affine)).affine[:3, 2])), 6)
+    zpos = np.arange(ref.shape[2]) / dz                               # ref slice k sits at native slice k/dz
+    if order == 0:
+        idx = np.clip(np.round(zpos).astype(int), 0, Z - 1)
+        return np.ascontiguousarray(can[:, :, idx]).astype(np.float32)
+    i0 = np.clip(np.floor(zpos).astype(int), 0, Z - 1)
+    i1 = np.clip(i0 + 1, 0, Z - 1)
+    w = (zpos - i0).astype(np.float32)
+    out = can[:, :, i0] * (1.0 - w) + can[:, :, i1] * w
+    out[:, :, zpos > Z - 1 + 1e-6] = 0.0                              # beyond the last native slice
+    return np.ascontiguousarray(out).astype(np.float32)
 
 
 def fov_analysis(brain, covered, covered_b0, dwi_z_range, min_vox, cov_frac, erase):
@@ -204,18 +263,20 @@ def main(args):
     wdirs = world_dirs(bvecs, dwi_img.affine)
     ref, shape, aff, info = model_grid(dwi_img, mask_img, args.z_margin)
     grid = (shape, aff)
-    print(f"model grid {shape} @ {VOX} mm; DWI occupies z {info['dwi_z_range_in_grid']} of {shape[2]}", flush=True)
+    vox = [float(np.linalg.norm(aff[:3, 0])), float(np.linalg.norm(aff[:3, 1])), float(np.linalg.norm(aff[:3, 2]))]
+    print(f"model grid {shape} @ {vox[0]:.3f}x{vox[1]:.3f}x{vox[2]:g} mm ({info['grid']}); DWI occupies z {info['dwi_z_range_in_grid']} of {shape[2]}", flush=True)
 
     needed = sorted(set(b0_idx) | {i for s in shells for i in s["indices"]})
     dwi = np.asarray(dwi_img.dataobj, dtype=np.float32)
+    to_ref = to_native_lattice_ref if info["grid"] == "native_lattice" else resample
     vols = Parallel(n_jobs=args.threads, prefer="threads")(
-        delayed(resample)(dwi[..., t], dwi_img.affine, ref, 1)
+        delayed(to_ref)(dwi[..., t], dwi_img.affine, ref, 1)
         for t in tqdm(needed, desc="resample DWI", unit="vol"))
     data = np.zeros(shape + (dwi.shape[3],), np.float32)
     for t, v in zip(needed, vols):
         data[..., t] = embed(v, shape, info)
     del dwi, vols
-    footprint = embed(resample(np.ones(dwi_img.shape[:3], np.float32), dwi_img.affine, ref, 0), shape, info) > 0.5
+    footprint = embed(to_ref(np.ones(dwi_img.shape[:3], np.float32), dwi_img.affine, ref, 0), shape, info) > 0.5
     S0 = np.clip(data[..., b0_idx].mean(axis=-1), SIG_FLOOR, None)
     b0m = data[..., b0_idx].mean(axis=-1)
     covered_b0 = footprint & (b0m > 0)
@@ -246,7 +307,7 @@ def main(args):
             arrays[f"adc_{s['label']}"] = np.ascontiguousarray(np.moveaxis(adc6, 2, 0)).astype(np.float32)
         meta_shells.append(dict(label=s["label"], b_mean=b, n_dirs=int(len(idx)), indices=s["indices"],
                                 bvals=[float(v) for v in bvals[idx]], dirs_world=wdirs[idx].tolist()))
-    meta = dict(model=model, shape=list(shape), affine=aff.tolist(), vox=list(VOX), grid=info, t1_p99=p99,
+    meta = dict(model=model, shape=list(shape), affine=aff.tolist(), vox=vox, grid=info, t1_p99=p99,
                 clip_max=CLIP_MAX, adc_scale=ADC_SCALE, shells=meta_shells,
                 dirs30=mrtrix30.tolist(), dirs6=DIRECTIONS6.tolist())
     np.savez(work / "model_input.npz", t1=t1n, brain=np.moveaxis(brain, 2, 0), covered=np.moveaxis(covered, 2, 0),

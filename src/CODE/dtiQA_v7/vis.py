@@ -1125,15 +1125,16 @@ def vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_ty
         glyph_load_str = '-fixel.load'
         glyph_title_str = 'Principal Eigenvectors'
 
-    # Generate mrview commands and plot glyphs
+    # Generate mrview commands and plot glyphs. mrview renders with the container's own Mesa OpenGL under
+    # xvfb; _mrview_env() keeps it away from the host GL libraries that singularity --nv injects.
 
     for i in planes:
-        vis_cmd = 'mrview -load {} {} {} {} -mode 1 -plane {} -fov 160 -voxel {} -focus 0 -size 1200,1200 -capture.folder {} -capture.prefix {} -capture.grab -noannotations -exit -nthreads {}'.format(
-            fa_file, glyph_load_str, glyph_file, fov_overlay_str, i, cc_center_voxel_str, temp_dir, planes[i], SHARED_VARS.NUM_THREADS-1
+        vis_cmd = '{}mrview -load {} {} {} {} -mode 1 -plane {} -fov 160 -voxel {} -focus 0 -size 1200,1200 -capture.folder {} -capture.prefix {} -capture.grab -noannotations -exit -nthreads {}'.format(
+            _mrview_env(), fa_file, glyph_load_str, glyph_file, fov_overlay_str, i, cc_center_voxel_str, temp_dir, planes[i], SHARED_VARS.NUM_THREADS-1
         )
         utils.run_cmd(vis_cmd) # will save as '<planes[i]>0000.png'
-        vis_zoom_cmd = 'mrview -load {} {} {} {} -mode 1 -plane {} -fov 80 -voxel {} -focus 0 -size 1200,1200 -capture.folder {} -capture.prefix {} -capture.grab -noannotations -exit -nthreads {}'.format(
-            fa_file, glyph_load_str, glyph_file, fov_overlay_str, i, cc_center_voxel_str, temp_dir, '{}_zoom'.format(planes[i]), SHARED_VARS.NUM_THREADS-1 # will save as 'planes[i]_zoom0000.png'
+        vis_zoom_cmd = '{}mrview -load {} {} {} {} -mode 1 -plane {} -fov 80 -voxel {} -focus 0 -size 1200,1200 -capture.folder {} -capture.prefix {} -capture.grab -noannotations -exit -nthreads {}'.format(
+            _mrview_env(), fa_file, glyph_load_str, glyph_file, fov_overlay_str, i, cc_center_voxel_str, temp_dir, '{}_zoom'.format(planes[i]), SHARED_VARS.NUM_THREADS-1 # will save as 'planes[i]_zoom0000.png'
         )
         utils.run_cmd(vis_zoom_cmd)
 
@@ -1190,6 +1191,18 @@ def vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_ty
     return glyph_vis_file
 
 # Helper Functions
+
+def _mrview_env():
+
+    # Command prefix for mrview. When the container runs with --nv, singularity binds the host's GL
+    # libraries (libGLX, libGLdispatch, built against the host glibc) into /.singularity.d/libs and puts
+    # that directory first on LD_LIBRARY_PATH; mrview then fails to load them ("GLIBC_x.y not found").
+    # Only CUDA programs need that directory, so mrview gets a library path without it and renders with
+    # the container's Mesa under xvfb, exactly as it does without --nv.
+
+    ld_path = os.environ.get('LD_LIBRARY_PATH', '')
+    kept = [p for p in ld_path.split(':') if p != '' and '.singularity.d' not in p]
+    return 'env LD_LIBRARY_PATH={} '.format(':'.join(kept))
 
 def _methods_strs(use_topup, use_synb0, params):
 
@@ -1255,7 +1268,7 @@ def _methods_strs(use_topup, use_synb0, params):
     c += 1
 
     if params.get('use_tardis', False):
-        s.append('As an additional step, the superior and inferior brain slices cut off by the diffusion acquisition field of view were regenerated with TARDIS, a conditional flow-matching model by Rudravaram et al. [{}] that synthesizes diffusion ADC (or tensor) slices autoregressively from the adjacent acquired slices and the co-registered T1. The T1 was first Rician-denoised and N4 bias-field corrected with ANTs, skull-stripped with SynthStrip, and registered to the mean preprocessed b0 with epi_reg. The acquired slices were not modified; the extended data, a synthetic DWI derived from them, and their CSD or tensor fits are provided separately'.format(c))
+        s.append('As an additional step, the superior and inferior brain slices cut off by the diffusion acquisition field of view were regenerated with TARDIS, a conditional flow-matching model by Rudravaram et al. [{}] that synthesizes diffusion ADC (or tensor) slices autoregressively from the adjacent acquired slices and the co-registered T1. The T1 was first Rician-denoised and N4 bias-field corrected with ANTs, {}registered to the mean preprocessed b0 with epi_reg. The acquired slices were not modified; the extended data, a synthetic DWI derived from them, and their CSD or tensor fits are provided separately'.format('' if params.get('t1_stripped', False) else 'skull-stripped with SynthStrip, and ', c))
         r.append('[{}] Rudravaram, G. et al. (2026). Generalizable field of view extension for diffusion MRI via conditional flow matching. arXiv:2610.17401.'.format(c))
         c += 1
 

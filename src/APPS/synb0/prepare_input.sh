@@ -74,7 +74,7 @@ eval $C3D_CMD
 echo -------
 echo ANTS syn registration
 ANTS_OUT=$JOB_PATH/ANTS
-ANTS_CMD="antsRegistrationSyNQuick.sh -d 3 -f $T1_ATLAS_PATH -m $T1_PATH -o $ANTS_OUT -n 1" # doing 1 thread (-n) for parallel scripts and on accre with one core
+ANTS_CMD="antsRegistrationSyNQuick.sh -d 3 -f $T1_ATLAS_PATH -m $T1_PATH -o $ANTS_OUT -n ${ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS:-1}" # thread count from PreQual --num_threads (1 if unset)
 echo $ANTS_CMD
 eval $ANTS_CMD
 
