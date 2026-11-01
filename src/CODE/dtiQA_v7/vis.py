@@ -308,7 +308,12 @@ def vis_preproc(dwi_files, bvals_files, dwi_preproc_file, bvals_preproc_file, ed
         center_vol_file = fov['acquired']
         fov_markers = utils.fov_marker_slices(fov)
 
-    b0_preproc_slices, b0_preproc_vox_dim, b0_preproc_min, b0_preproc_max = utils.slice_nii(b0_preproc_file, min_intensity=0, max_percentile=SHARED_VARS.VIS_PERCENTILE_MAX, center_vol_file=center_vol_file)
+    # Window on the brain: spline overshoots at the edge of the FOV along the phase encoding axis (eddy's
+    # resampling) can be far brighter than any brain voxel and would otherwise darken the whole panel.
+    b0_preproc_img, _, _ = utils.load_nii(b0_preproc_file, ndim=3)
+    brain_img, _, _ = utils.load_nii(mask_file, dtype='bool', ndim=3)
+    b0_preproc_max = np.nanpercentile(b0_preproc_img[brain_img], SHARED_VARS.VIS_PERCENTILE_MAX) if np.any(brain_img) else np.nanpercentile(b0_preproc_img, SHARED_VARS.VIS_PERCENTILE_MAX)
+    b0_preproc_slices, b0_preproc_vox_dim, b0_preproc_min, _ = utils.slice_nii(b0_preproc_file, min_intensity=0, max_intensity=b0_preproc_max, center_vol_file=center_vol_file)
 
     mask_slices, _, _, _ = utils.slice_nii(mask_file, center_vol_file=center_vol_file)
     stats_mask_slices, _, _, _ = utils.slice_nii(stats_mask_file, center_vol_file=center_vol_file)
@@ -960,9 +965,12 @@ def vis_gradcheck(bvals_files, bvecs_files, bvals_preproc_file, bvecs_preproc_fi
 
     return gradcheck_vis_file
 
-def vis_dwi(dwi_file, bvals_shelled, bvecs_file, cnr_dict, vis_dir):
+def vis_dwi(dwi_file, bvals_shelled, bvecs_file, cnr_dict, vis_dir, mask_file=None):
 
-    # Per-shell averages of the preprocessed data as acquired (the TARDIS extension is not shown here)
+    # Per-shell averages of the preprocessed data as acquired (the TARDIS extension is not shown here).
+    # The intensity window runs from 0 to the 99.9th percentile inside the brain mask when one is given, so
+    # that a few very bright voxels at the edge of the field of view (eddy's extrapolation along the phase
+    # encoding axis, for example) cannot stretch the window and turn the brain dark.
 
     print('VISUALIZING DWI')
 
@@ -972,6 +980,9 @@ def vis_dwi(dwi_file, bvals_shelled, bvecs_file, cnr_dict, vis_dir):
     
     bvals = np.sort(np.unique(bvals_shelled))
     offsets = [-10, -5, 0, 5, 10]
+    mask_img = None
+    if mask_file is not None:
+        mask_img, _, _ = utils.load_nii(mask_file, dtype='bool', ndim=3)
 
     for i in range(len(bvals)):
 
@@ -981,7 +992,12 @@ def vis_dwi(dwi_file, bvals_shelled, bvecs_file, cnr_dict, vis_dir):
         bXs_file, num_bXs, _ = utils.dwi_extract(dwi_file, bvals_shelled_file, temp_dir, target_bval=bX, first_only=False)
         bXs_avg_file = utils.dwi_avg(bXs_file, temp_dir)
 
-        bXs_avg_slices, bXs_avg_vox_dim, bXs_avg_min, bXs_avg_max = utils.slice_nii(bXs_avg_file, offsets=offsets, min_intensity=0, max_percentile=SHARED_VARS.VIS_PERCENTILE_MAX)
+        if mask_img is not None:
+            bXs_avg_img, _, _ = utils.load_nii(bXs_avg_file, ndim=3)
+            bXs_avg_max = np.nanpercentile(bXs_avg_img[mask_img], SHARED_VARS.VIS_PERCENTILE_MAX)
+            bXs_avg_slices, bXs_avg_vox_dim, bXs_avg_min, _ = utils.slice_nii(bXs_avg_file, offsets=offsets, min_intensity=0, max_intensity=bXs_avg_max)
+        else:
+            bXs_avg_slices, bXs_avg_vox_dim, bXs_avg_min, bXs_avg_max = utils.slice_nii(bXs_avg_file, offsets=offsets, min_intensity=0, max_percentile=SHARED_VARS.VIS_PERCENTILE_MAX)
         
         cnr = '{:.3f}'.format(cnr_dict[bX])
         cnr_label = 'SNR' if bX == 0 else 'CNR'
@@ -1248,7 +1264,8 @@ def _methods_strs(use_topup, use_synb0, params):
             pre_str = 'FSL\'s topup and eddy algorithms were used to correct for susceptibilty-induced and'
     else:
             pre_str = 'FSL\'s eddy algorithm was then used to correct for'
-    s.append('{} motion artifacts and eddy currents and to remove outlier slices [{}][{}][{}][{}].'.format(pre_str, c, c+1, c+2, c+3))
+    s.append('{} motion artifacts and eddy currents and to remove outlier slices [{}][{}][{}][{}].{}'.format(pre_str, c, c+1, c+2, c+3,
+        ' Voxels that the susceptibility correction sampled from outside the acquired field of view (where eddy\'s spline interpolation overshoots) were set to zero.' if use_topup else ''))
     r.append('[{}] Andersson, J. L. et al. (2003). How to correct susceptibility distortions in spin-echo echo-planar images: application to diffusion tensor imaging. Neuroimage, 20(2), 870-888.'.format(c))
     r.append('[{}] Smith, S. M. et al. (2004). Advances in functional and structural MR image analysis and implementation as FSL. Neuroimage, 23, S208-S219.'.format(c+1))
     r.append('[{}] Andersson, J. L. et al. (2016). An integrated approach to correction for off-resonance effects and subject movement in diffusion MR imaging. Neuroimage, 125, 1063-1078.'.format(c+2))

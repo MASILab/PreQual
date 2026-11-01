@@ -66,6 +66,7 @@ Topup runs when a reverse phase-encoded scan was supplied, or when a T1 was supp
 | `preproc_input_b0_*.nii.gz` | The b0 volumes given to topup (`_all` or `_first_b0s_only` depending on `--topup_first_b0s_only`), with `_smooth_with_b0_syn` when the synthetic b0 was appended. |
 | `*_topped_up.nii.gz` | The same b0s after topup correction. |
 | `topup_field.nii.gz` | The estimated susceptibility field in Hz. |
+| `topup_displacement_<nn>.nii.gz` | Topup's displacement field for input b0 `nn` (one per acqparams line, applywarp format). After eddy, PreQual pushes a volume of ones through the field of each acquisition to find the voxels the correction sampled from outside the acquired matrix and zeroes them (eddy's spline interpolation overshoots there, mostly in the last rows along the phase encoding axis outside the brain). |
 | `topup_results_fieldcoef.nii.gz`, `topup_results_movpar.txt` | Topup's spline field coefficients and movement parameters, consumed by eddy. |
 | `*.topup_log` | Topup's log. |
 
@@ -117,7 +118,7 @@ The final output.
 
 | File | What it is |
 |---|---|
-| `dwmri.nii.gz`, `dwmri.bval`, `dwmri.bvec` | All input scans, concatenated in `dtiQA_config.csv` order, after every preprocessing step that ran. The b-vectors are eddy's rotated vectors in FSL convention. |
+| `dwmri.nii.gz`, `dwmri.bval`, `dwmri.bvec` | All input scans, concatenated in `dtiQA_config.csv` order, after every preprocessing step that ran. The b-vectors are eddy's rotated vectors in FSL convention. When topup ran, voxels that the susceptibility correction had to sample from outside the acquired field of view are zero (see `TOPUP/topup_displacement_*`). |
 | `<image>_preproc.nii.gz / .bval / .bvec` | Only with `--split_outputs`: the same data split back into one file per input scan. The merged `dwmri.*` files are then removed. |
 | `mask.nii.gz` | Brain mask from `bet` on the average b0, `-f 0.25 -R`. Used for the tensor fit and all statistics. |
 | `improbable_mask.nii.gz` | Only with `--improbable_mask on`: the brain mask with voxels removed where the minimum b0 signal is lower than the minimum diffusion-weighted signal. |

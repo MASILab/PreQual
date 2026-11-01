@@ -190,7 +190,15 @@ From: /nfs2/harmonization/singularities/neuro_base_with_ants.tar
     mkdir -p "$MPLCONFIGDIR" "$XDG_CACHE_HOME" "$XDG_RUNTIME_DIR" "$UV_CACHE_DIR" 2>/dev/null
     chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null
     cd /tmp # never run from the (possibly bound) home directory: MRtrix scripts default their scratch to the cwd
-    xvfb-run -a --server-args="-screen 0 1600x1280x24 -ac" bash /CODE/run_dtiQA.sh /INPUTS /OUTPUTS "$@"
+    # --nv binds the host's GL libraries (libGLX, libGLdispatch, built against the host glibc) into
+    # /.singularity.d/libs and puts it first on LD_LIBRARY_PATH. Xvfb would load them for its GLX module and die,
+    # leaving mrview without a display. So Xvfb is started with a library path without that directory, and the
+    # full path is restored for the pipeline itself so that eddy_cuda and torch keep the CUDA libraries
+    # (mrview strips it again for its own process, see vis.py).
+    export PREQUAL_LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
+    XVFB_LD_LIBRARY_PATH=$(printf '%s' "${LD_LIBRARY_PATH:-}" | tr ':' '\n' | grep -v '\.singularity\.d' | paste -sd: -)
+    LD_LIBRARY_PATH="$XVFB_LD_LIBRARY_PATH" xvfb-run -a --server-args="-screen 0 1600x1280x24 -ac" \
+        bash -c 'export LD_LIBRARY_PATH="$PREQUAL_LD_LIBRARY_PATH"; exec bash /CODE/run_dtiQA.sh /INPUTS /OUTPUTS "$@"' _ "$@"
 
 %test
     set -eu

@@ -189,7 +189,7 @@ def main():
     vis_files.append(vis.vis_preproc(dwi_raw_files, bvals_raw_files, dwi_preproc_file, bvals_preproc_file, eddy_mask_file, mask_file, percent_improbable, chisq_mask_file, vis_dir, fov=fov))
     if use_tardis:
         vis_files.extend(vis.vis_tardis(tardis_dir, vis_dir))
-    vis_files.extend(vis.vis_dwi(dwi_preproc_file, bvals_preproc_shelled, bvecs_preproc_file, cnr_dict, vis_dir))
+    vis_files.extend(vis.vis_dwi(dwi_preproc_file, bvals_preproc_shelled, bvecs_preproc_file, cnr_dict, vis_dir, mask_file=mask_file))
     vis_files.append(vis.vis_glyphs(tensor_file, v1_file, fa_file, cc_center_voxel, vis_dir, glyph_type=args.glyph_type, fov=fov))
     vis_files.append(vis.vis_scalar(fa_file, vis_dir, name='FA', comment='White matter should be bright', fov=fov))
     vis_files.append(vis.vis_fa_stats(roi_names, roi_med_fa, fa_file, atlas2subj_file, vis_dir, fov=fov))

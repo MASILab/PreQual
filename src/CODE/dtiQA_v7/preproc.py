@@ -8,9 +8,11 @@
 import sys
 import os
 import subprocess
+import glob
 
 import nibabel as nib
 import numpy as np
+from scipy.ndimage import binary_dilation
 
 import utils
 from vars import SHARED_VARS
@@ -194,8 +196,12 @@ def topup(topup_input_b0s_file, topup_acqparams_file, extra_topup_args, topup_di
 
     # Run topup on all b0s
 
-    topup_cmd = 'topup --verbose --imain={} --datain={} --config={} --iout={} --out={} --fout={} {}'.format(
-        topup_input_b0s_file, topup_acqparams_file, SHARED_VARS.TOPUP_CNF_FILE, topup_output_b0s_file, topup_results_prefix, topup_output_field_file, extra_topup_args)
+    # --dfout: one displacement field per input b0 (per acqparams row), used after eddy to find the voxels the
+    # susceptibility correction samples from outside the acquired field of view (see _zero_out_of_fov)
+    topup_dfield_prefix = os.path.join(topup_dir, 'topup_displacement')
+
+    topup_cmd = 'topup --verbose --imain={} --datain={} --config={} --iout={} --out={} --fout={} --dfout={} {}'.format(
+        topup_input_b0s_file, topup_acqparams_file, SHARED_VARS.TOPUP_CNF_FILE, topup_output_b0s_file, topup_results_prefix, topup_output_field_file, topup_dfield_prefix, extra_topup_args)
     utils.run_cmd(topup_cmd)
 
     print('FINISHED TOPPING UP')
@@ -262,6 +268,11 @@ def eddy(eddy_input_dwi_file, eddy_input_bvals_file, eddy_input_bvecs_file, eddy
         eddy_force_cmd = '{} --data_is_shelled'.format(eddy_cmd)
         utils.run_cmd(eddy_force_cmd)
 
+    # Zero the voxels that the susceptibility correction sampled from outside the acquired field of view
+
+    if topup_results_prefix != '':
+        _zero_out_of_fov('{}.nii.gz'.format(eddy_results_prefix), eddy_index_file, os.path.join(os.path.dirname(topup_results_prefix), 'topup_displacement'), eddy_dir)
+
     # Rename outputs
 
     eddy_input_prefix = utils.get_prefix(eddy_input_dwi_file)
@@ -284,6 +295,52 @@ def eddy(eddy_input_dwi_file, eddy_input_bvals_file, eddy_input_bvecs_file, eddy
     print('FINISHED EDDY')
 
     return eddy_output_dwi_file, eddy_output_bvals_file, eddy_output_bvecs_file, eddy_mask_file, eddy_warning_str
+
+def _zero_out_of_fov(dwi_file, index_file, dfield_prefix, work_dir, dilate=3):
+
+    # Eddy resamples every volume through the topup field. Where the field pushes a voxel beyond the acquired
+    # matrix along the phase encoding axis (outside the brain, where a Synb0 field is unconstrained, this can be
+    # tens of voxels) there is no data to sample, and eddy's spline interpolation overshoots: values of many
+    # times the brain signal, and negative values, in the last rows of the volume. Those voxels are located with
+    # FSL's own geometry, so no sign convention is assumed: the displacement field topup wrote for the volume's
+    # acqparams row (--dfout) is applied with applywarp to a volume of ones, which gives the fraction of every
+    # output voxel that was sampled inside the field of view. Voxels below full coverage, dilated by `dilate`
+    # voxels to take the ringing next to them, are set to zero in every volume of that row.
+
+    print('ZEROING VOXELS THAT THE SUSCEPTIBILITY CORRECTION SAMPLED FROM OUTSIDE THE ACQUIRED FIELD OF VIEW')
+
+    dfield_files = sorted(glob.glob('{}_*.nii.gz'.format(dfield_prefix)), key=lambda f: int(os.path.basename(f).split('_')[-1].split('.')[0]))
+    if len(dfield_files) == 0:
+        print('WARNING: NO TOPUP DISPLACEMENT FIELDS FOUND AT {}_*.nii.gz, SKIPPING'.format(dfield_prefix))
+        return 0
+
+    index = np.loadtxt(index_file).ravel().astype(int) # 1-based acqparams row per volume
+    dwi_img, dwi_aff, _ = utils.load_nii(dwi_file, ndim=4)
+
+    ones_file = os.path.join(work_dir, 'fov_ones.nii.gz')
+    utils.save_nii(np.ones(dwi_img.shape[:3], dtype=np.float32), dwi_aff, ones_file)
+
+    num_zeroed = 0
+    for row in np.unique(index):
+        if row < 1 or row > len(dfield_files):
+            print('WARNING: EDDY INDEX ROW {} HAS NO TOPUP DISPLACEMENT FIELD ({} FOUND), SKIPPING ITS VOLUMES'.format(row, len(dfield_files)))
+            continue
+        coverage_file = os.path.join(work_dir, 'fov_coverage_{:02d}.nii.gz'.format(row))
+        utils.run_cmd('applywarp -i {} -r {} -w {} -o {} --interp=trilinear'.format(ones_file, ones_file, dfield_files[row-1], coverage_file))
+        coverage, _, _ = utils.load_nii(coverage_file, ndim=3)
+        outside = binary_dilation(coverage < 0.999, iterations=dilate)
+        vols = np.where(index == row)[0]
+        sub = dwi_img[..., vols]
+        sub[outside] = 0
+        dwi_img[..., vols] = sub
+        num_zeroed += int(outside.sum()) * len(vols)
+        print('ACQPARAMS ROW {}: {} VOXELS PER VOLUME OUTSIDE THE ACQUIRED FOV AFTER CORRECTION, ZEROED IN {} VOLUME(S)'.format(row, int(outside.sum()), len(vols)))
+        utils.remove_file(coverage_file)
+    utils.remove_file(ones_file)
+
+    utils.save_nii(dwi_img, dwi_aff, dwi_file, ndim=4)
+
+    return num_zeroed
 
 def mask(dwi_file, bvals_file, mask_type, mask_dir):
 
