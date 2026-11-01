@@ -1441,6 +1441,7 @@ def vis_tardis(tardis_dir, vis_dir):
         fov = json.load(f)
     with open(os.path.join(tardis_dir, 'primary_output.txt')) as f:
         kind, label, primary_dir = f.read().split()
+    primary_dir = os.path.join(tardis_dir, os.path.basename(primary_dir.rstrip('/'))) # stored as an absolute path of the original run (e.g. /OUTPUTS/TARDIS/...), resolve it against the TARDIS folder we were given
     with open(os.path.join(tardis_dir, 'inference.json')) as f:
         inf = json.load(f)
     with open(os.path.join(tardis_dir, 'meta.json')) as f:
