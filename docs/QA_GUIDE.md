@@ -171,7 +171,7 @@ One page per unique b-value. Each shows the average of all volumes in that shell
 
 ### Tensors
 
-![Tensors page](images/qa/12-tensors.png)
+![Tensors page](images/qa/12-tensors.jpg)
 
 **What it shows.** The fitted tensors (or principal eigenvectors with `--glyph_type vector`) as glyphs on the FA, at a full and a zoomed field of view. Color is orientation: red left-right, green anterior-posterior, blue superior-inferior. Tensors with negative eigenvalues or eigenvalues above the diffusivity of water are not drawn. Below the blue line the glyphs come from the TARDIS data.
 
