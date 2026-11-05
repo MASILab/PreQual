@@ -40,7 +40,9 @@ A scan that passes these five is usually fine. The rest of the report tells you 
 
 **Check.**
 
-- The susceptibility distortion is visible along the stated axis and nowhere else. With j (anterior-posterior) encoding, the frontal lobe and brainstem look stretched or squashed front-to-back in the sagittal view and the axial view, while the coronal view looks normal.
+- The susceptibility distortion is visible along the stated axis and nowhere else. With +j (anterior-posterior) encoding, the frontal lobe looks squashed front-to-back in the sagittal view and the axial view, while the coronal view looks normal.
+- With phase encoding direction -j, the brain looks squished at the occipital lobe and stretched at the frontal lobe.
+- Diffusion scans are usually not collected in the phase encoding direction 'i' or 'k'
 - With more than one scan, all of them show the same axis. Scans listed with a reverse direction (for topup) should show the opposite distortion, for example a frontal lobe squashed in one scan and stretched in the other.
 
 **Flag** a report where the distortion runs along a different axis than the label, or where the scans disagree. The configuration file was wrong and the run has to be repeated.
@@ -63,6 +65,7 @@ A scan that passes these five is usually fine. The rest of the report tells you 
 Only present when no reverse phase-encoded image was given and a T1 was.
 
 **What it shows.** The distorted b0 that went in, the T1 used, and the synthetic undistorted b0 that came out. Topup then estimates the field from the distorted and synthetic pair.
+- Remember to always supply a skull-stripped mask to T1w image to synb0, it makes it more robust.
 
 **Check.**
 
